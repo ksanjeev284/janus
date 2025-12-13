@@ -51,6 +51,20 @@ If you find a bug or have a feature request, please open an issue on GitHub. Inc
 -   Expected vs. actual behavior.
 -   Environment details (OS, Python version).
 
+## Release Process
+
+Janus uses automated workflows for releases. To publish a new version to PyPI:
+
+1.  **Bump Version**: Update `version` in `pyproject.toml` (e.g., `0.2.0`).
+2.  **Commit**: Commit the version change.
+3.  **GitHub Release**:
+    -   Go to the repository on GitHub.
+    -   Click "Releases" -> "Draft a new release".
+    -   Tag version: `v0.2.0`.
+    -   Title: `v0.2.0 - Feature Name`.
+    -   Click "Publish release".
+4.  **Automation**: The GitHub Action will automatically build and upload to PyPI (requires `PYPI_API_TOKEN` secret).
+
 ## License
 
 By contributing, you agree that your contributions will be licensed under the MIT License.
