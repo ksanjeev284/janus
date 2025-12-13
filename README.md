@@ -4,6 +4,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Code Style: Black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Docker Deploy](https://github.com/ksanjeev284/janus/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/ksanjeev284/janus/actions/workflows/docker-publish.yml)
+[![PyPI version](https://badge.fury.io/py/janus-security.svg)](https://badge.fury.io/py/janus-security)
 
 **Janus** is an enterprise-grade API security scanner designed for Red Teams and advanced security testing. Unlike traditional scanners, Janus uses a distinct approach for detecting **BOLA (Broken Object Level Authorization)**, **BFLA**, and **Race Conditions** without relying on external AI APIs.
 
@@ -21,6 +22,11 @@
 -   **Web Dashboard**: Modern UI for managing scans and viewing reports.
 
 ## Installation 📦
+
+### PyPI (Recommended)
+```bash
+pip install janus-security
+```
 
 ### From Source
 ```bash
