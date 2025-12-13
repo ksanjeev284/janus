@@ -12,7 +12,6 @@ jobs:
       name: pypi
       url: https://pypi.org/p/janus-security
     permissions:
-      id-token: write  # IMPORTANT: this permission is mandatory for trusted publishing
       contents: read
 
     steps:
