@@ -31,6 +31,14 @@ pip install .
 ## Quick Start 🏃‍♂️
 
 ### 1. Web Dashboard (Recommended)
+
+**Option A: Using Docker (Fastest)**
+```bash
+# Pull and run the latest image
+docker run -p 8000:8000 ghcr.io/ksanjeev284/janus:latest
+```
+
+**Option B: From Source**
 Start the web server and dashboard:
 ```bash
 python -m janus.interface.web.server
