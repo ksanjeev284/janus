@@ -1,0 +1,44 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "janus-security"
+version = "0.1.0"
+description = "Enterprise-grade BOLA and API Vulnerability Scanner"
+readme = "README.md"
+authors = [
+    { name = "Janus Team", email = "maintainers@janus-security.io" },
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+    "Topic :: Software Development :: Testing",
+]
+requires-python = ">=3.10"
+dependencies = [
+    "typer>=0.9.0",
+    "rich>=13.0.0",
+    "requests>=2.31.0",
+    "fastapi>=0.100.0",
+    "uvicorn>=0.23.0",
+    "redis>=5.0.0",
+    "fake-useragent>=1.1.0",
+    "python-multipart>=0.0.6",
+]
+
+[project.scripts]
+janus = "janus.interface.cli:app"
+
+[project.urls]
+Homepage = "https://github.com/ksanjeev284/janus"
+Issues = "https://github.com/ksanjeev284/janus/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["janus"]

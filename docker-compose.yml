@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  # The Brain (Database) - Optional, falls back to JSON
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  # Janus Web GUI + API
+  janus-web:
+    build: .
+    command: uvicorn janus.interface.web.server:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+    volumes:
+      - ./data:/app/data
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    restart: unless-stopped
+
+  # Janus Proxy (Learning Mode)
+  # You need to configure TARGET_URL for your specific target
+  janus-proxy:
+    image: mitmproxy/mitmproxy
+    command: mitmdump -s /app/janus/core/proxy.py --mode reverse:http://host.docker.internal:5000 -p 8080
+    volumes:
+      - .:/app
+      - ./data:/app/data
+    ports:
+      - "8080:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+volumes:
+  redis_data:

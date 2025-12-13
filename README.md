@@ -1,0 +1,68 @@
+# Janus Security Scanner 🛡️
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![Code Style: Black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+
+**Janus** is an enterprise-grade API security scanner designed for Red Teams and advanced security testing. Unlike traditional scanners, Janus uses a distinct approach for detecting **BOLA (Broken Object Level Authorization)**, **BFLA**, and **Race Conditions** without relying on external AI APIs.
+
+![Janus Dashboard](https://github.com/ksanjeev284/janus/raw/main/docs/dashboard-preview.png)
+
+## Features 🚀
+
+-   **BOLA/IDOR Detection**: Automatic analysis of resource access patterns.
+-   **Broken Function Level Authorization (BFLA)**: Vertical privilege escalation testing.
+-   **PII & Secrets Scanning**: Detect sensitive data leaks in API responses.
+-   **Race Condition Testing**: Multi-threaded exploitation of concurrency bugs.
+-   **Stealth Mode**: WAF evasion with header rotation, jitter, and proxies.
+-   **Team Collaboration**: Real-time finding synchronization via Redis/Hive-Mind.
+-   **CI/CD Integration**: Export findings to SARIF for GitHub Security tab.
+-   **Web Dashboard**: Modern UI for managing scans and viewing reports.
+
+## Installation 📦
+
+### From Source
+```bash
+git clone https://github.com/ksanjeev284/janus.git
+cd janus
+pip install .
+```
+
+## Quick Start 🏃‍♂️
+
+### 1. Web Dashboard (Recommended)
+Start the web server and dashboard:
+```bash
+python -m janus.interface.web.server
+# Access at http://localhost:8000
+```
+
+### 2. CLI Usage
+Janus provides a powerful CLI for automation testing.
+
+**Basic BOLA Scan:**
+```bash
+janus scan --victim <token> --attacker <token> --host <url>
+```
+
+**Stealth Test:**
+```bash
+janus stealth-test
+```
+
+**Vertical Escalation (BFLA):**
+```bash
+janus bfla --host https://api.example.com --low <user_token>
+```
+
+## Architecture 🏗️
+
+Janus operates by "learning" from legitimate traffic (via its proxy or provided tokens) to understand the structure of API resources. It then attempts to access those same resources using a different user's context (the attacker), analyzing the structural similarity of the responses to determine vulnerability.
+
+## Contributing 🤝
+
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+
+## License 📄
+
+MIT License - see [LICENSE](LICENSE) for details.
