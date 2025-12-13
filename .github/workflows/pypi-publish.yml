@@ -27,8 +27,17 @@ jobs:
       - name: Build package
         run: python -m build
 
+      - name: Debug Secret Presence
+        run: |
+          if [[ -z "${{ secrets.PYPI_API_TOKEN }}" ]]; then
+            echo "::error::PYPI_API_TOKEN is EMPTY or MISSING!"
+            exit 1
+          else
+            echo "PYPI_API_TOKEN is present (masked)."
+          fi
+
       - name: Publish package distributions to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          # Use API token method (simplest for user setup)
+          user: __token__
           password: ${{ secrets.PYPI_API_TOKEN }}
