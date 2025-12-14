@@ -1568,6 +1568,71 @@ async def test_ratelimit(url: str = Form(...), requests: int = Form(30), token: 
         return {"error": str(e)}
 
 
+@app.post("/api/ssti")
+async def test_ssti(url: str = Form(...), param: str = Form(""), engine: str = Form(""), token: str = Form("")):
+    """Test for Server-Side Template Injection."""
+    try:
+        from janus.attack.ssti_scanner import SSTIScanner
+        scanner = SSTIScanner(timeout=10)
+        
+        params = [param] if param else None
+        engines = [engine] if engine else None
+        
+        report = scanner.scan(url, params=params, token=token if token else None, engines=engines)
+        return {
+            "vulnerable": report.vulnerable_params > 0,
+            "params_tested": report.parameters_tested,
+            "vulnerable_params": report.vulnerable_params,
+            "findings": [f.to_dict() for f in report.findings]
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.post("/api/graphqlanalyze")
+async def analyze_graphql(url: str = Form(...), token: str = Form(""), deep: bool = Form(True)):
+    """Analyze GraphQL endpoint for security issues."""
+    try:
+        from janus.attack.graphql_introspection import GraphQLIntrospector
+        analyzer = GraphQLIntrospector(timeout=30)
+        
+        report = analyzer.analyze(url, token if token else None, deep_scan=deep)
+        return {
+            "introspection_enabled": report.introspection_enabled,
+            "types_discovered": report.types_discovered,
+            "queries_found": report.queries_found,
+            "mutations_found": report.mutations_found,
+            "subscriptions_found": report.subscriptions_found,
+            "sensitive_fields": report.sensitive_fields[:20],
+            "security_findings": [f.to_dict() for f in report.security_findings],
+            "queries": [q.to_dict() for q in report.queries[:10]],
+            "mutations": [m.to_dict() for m in report.mutations[:10]]
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.post("/api/websocket")
+async def test_websocket(url: str = Form(...), token: str = Form(""), origin: str = Form(""), message: str = Form("")):
+    """Test WebSocket endpoint for security issues."""
+    try:
+        from janus.attack.websocket_tester import WebSocketTester
+        tester = WebSocketTester(timeout=10)
+        
+        messages = [message] if message else None
+        report = tester.test(url, token if token else None, origin if origin else None, messages)
+        
+        return {
+            "connected": report.connected,
+            "connection_error": report.connection_error,
+            "messages_exchanged": report.messages_exchanged,
+            "security_findings": [f.to_dict() for f in report.security_findings],
+            "messages": [m.to_dict() for m in report.messages[:20]]
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
 @app.get("/v2")
 async def dashboard_v2():
     """Render the new modern dashboard."""

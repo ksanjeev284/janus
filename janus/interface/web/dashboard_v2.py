@@ -138,6 +138,9 @@ def get_modern_dashboard_html(tokens: list) -> str:
                 <button onclick="showPanel('lfi')" class="sidebar-item w-full text-left px-3 py-2 rounded-lg text-sm border-l-2 border-transparent flex items-center gap-2">
                     <span class="text-cyber-green">📂</span> Path Traversal
                 </button>
+                <button onclick="showPanel('ssti')" class="sidebar-item w-full text-left px-3 py-2 rounded-lg text-sm border-l-2 border-transparent flex items-center gap-2">
+                    <span class="text-cyber-purple">🧪</span> SSTI
+                </button>
             </div>
             
             <!-- Config Analysis Category -->
@@ -182,6 +185,9 @@ def get_modern_dashboard_html(tokens: list) -> str:
                 </button>
                 <button onclick="showPanel('graphql')" class="sidebar-item w-full text-left px-3 py-2 rounded-lg text-sm border-l-2 border-transparent flex items-center gap-2">
                     <span class="text-cyber-purple">💎</span> GraphQL
+                </button>
+                <button onclick="showPanel('websocket')" class="sidebar-item w-full text-left px-3 py-2 rounded-lg text-sm border-l-2 border-transparent flex items-center gap-2">
+                    <span class="text-cyber-blue">🔌</span> WebSocket
                 </button>
             </div>
             
@@ -562,12 +568,84 @@ def get_modern_dashboard_html(tokens: list) -> str:
                 </div>
                 
                 <div id="panel-graphql" class="bg-dark-800 rounded-2xl p-6 border border-dark-600 card-glow-purple hidden">
-                    <form id="graphqlForm" class="space-y-4">
+                    <div class="mb-4 p-3 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-xl border border-purple-500/30">
+                        <h3 class="font-bold text-purple-400 flex items-center gap-2">💎 GraphQL Security Analyzer</h3>
+                        <p class="text-xs text-gray-400 mt-1">Introspection, sensitive fields, dangerous mutations</p>
+                    </div>
+                    <form id="graphqlanalyzeForm" class="space-y-4">
                         <div>
                             <label class="block text-sm text-gray-400 mb-2">GraphQL Endpoint</label>
-                            <input type="text" name="endpoint" placeholder="https://api.example.com/graphql" class="w-full px-4 py-3 bg-dark-900 border border-dark-600 rounded-xl mono text-sm">
+                            <input type="text" name="url" placeholder="https://api.example.com/graphql" class="w-full px-4 py-3 bg-dark-900 border border-dark-600 rounded-xl mono text-sm">
                         </div>
-                        <button type="submit" class="btn-primary w-full py-3 gradient-purple rounded-xl font-semibold text-white">💎 Attack GraphQL</button>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-2">Auth Token (optional)</label>
+                            <input type="text" name="token" placeholder="Bearer token" class="w-full px-4 py-3 bg-dark-900 border border-dark-600 rounded-xl mono text-sm">
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <input type="checkbox" id="deepScan" name="deep" checked class="rounded">
+                            <label for="deepScan" class="text-sm text-gray-400">Deep scan (batch queries, depth limits)</label>
+                        </div>
+                        <button type="submit" class="btn-primary w-full py-3 gradient-purple rounded-xl font-semibold text-white">💎 Analyze GraphQL</button>
+                    </form>
+                </div>
+                
+                <!-- SSTI Panel -->
+                <div id="panel-ssti" class="bg-dark-800 rounded-2xl p-6 border border-dark-600 card-glow-purple hidden">
+                    <div class="mb-4 p-3 bg-gradient-to-r from-purple-500/20 to-indigo-500/20 rounded-xl border border-purple-500/30">
+                        <h3 class="font-bold text-purple-400 flex items-center gap-2">🧪 Server-Side Template Injection</h3>
+                        <p class="text-xs text-gray-400 mt-1">Jinja2, Twig, Smarty, FreeMarker, Velocity, Mako, ERB, Pebble</p>
+                    </div>
+                    <form id="sstiForm" class="space-y-4">
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-2">Target URL</label>
+                            <input type="text" name="url" placeholder="https://example.com/page?name=test" class="w-full px-4 py-3 bg-dark-900 border border-dark-600 rounded-xl mono text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-2">Parameter to Test</label>
+                            <input type="text" name="param" value="name" class="w-full px-4 py-3 bg-dark-900 border border-dark-600 rounded-xl mono text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-2">Template Engine (optional)</label>
+                            <select name="engine" class="w-full px-4 py-3 bg-dark-900 border border-dark-600 rounded-xl text-sm">
+                                <option value="">All Engines</option>
+                                <option value="jinja2">Jinja2 (Python/Flask)</option>
+                                <option value="twig">Twig (PHP)</option>
+                                <option value="smarty">Smarty (PHP)</option>
+                                <option value="freemarker">FreeMarker (Java)</option>
+                                <option value="velocity">Velocity (Java)</option>
+                                <option value="mako">Mako (Python)</option>
+                                <option value="erb">ERB (Ruby)</option>
+                                <option value="pebble">Pebble (Java)</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn-primary w-full py-3 gradient-purple rounded-xl font-semibold text-white">🧪 Test SSTI</button>
+                    </form>
+                </div>
+                
+                <!-- WebSocket Panel -->
+                <div id="panel-websocket" class="bg-dark-800 rounded-2xl p-6 border border-dark-600 card-glow-blue hidden">
+                    <div class="mb-4 p-3 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 rounded-xl border border-blue-500/30">
+                        <h3 class="font-bold text-blue-400 flex items-center gap-2">🔌 WebSocket Security Tester</h3>
+                        <p class="text-xs text-gray-400 mt-1">Auth bypass, CSWSH, message injection</p>
+                    </div>
+                    <form id="websocketForm" class="space-y-4">
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-2">WebSocket URL</label>
+                            <input type="text" name="url" placeholder="wss://example.com/ws or https://example.com/ws" class="w-full px-4 py-3 bg-dark-900 border border-dark-600 rounded-xl mono text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-2">Auth Token (optional)</label>
+                            <input type="text" name="token" placeholder="Bearer token" class="w-full px-4 py-3 bg-dark-900 border border-dark-600 rounded-xl mono text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-2">Custom Origin (for CSWSH)</label>
+                            <input type="text" name="origin" placeholder="https://evil.com" class="w-full px-4 py-3 bg-dark-900 border border-dark-600 rounded-xl mono text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-2">Test Message (optional)</label>
+                            <input type="text" name="message" placeholder='{{"type":"test"}}' class="w-full px-4 py-3 bg-dark-900 border border-dark-600 rounded-xl mono text-sm">
+                        </div>
+                        <button type="submit" class="btn-primary w-full py-3 gradient-blue rounded-xl font-semibold text-white">🔌 Test WebSocket</button>
                     </form>
                 </div>
             </div>
@@ -620,7 +698,9 @@ def get_modern_dashboard_html(tokens: list) -> str:
             'pii': ['PII Scanner', 'Detect sensitive data leaks in responses'],
             'cve': ['CVE Lookup', 'Check for known vulnerabilities'],
             'race': ['Race Condition', 'Concurrency exploitation testing'],
-            'graphql': ['GraphQL Attacks', 'Introspection, batching, DoS testing'],
+            'graphql': ['GraphQL Analyzer', 'Introspection, sensitive fields, depth limits'],
+            'ssti': ['SSTI Scanner', 'Server-Side Template Injection (9 engines)'],
+            'websocket': ['WebSocket Tester', 'Auth bypass, CSWSH, message injection'],
             'settings': ['Settings', 'Proxy, custom headers, and SSL configuration']
         }};
         
