@@ -41,6 +41,8 @@
 ### Advanced Features
 - **GraphQL Introspection** - Schema analysis, sensitive fields, dangerous mutations, depth limit testing
 - **WebSocket Testing** - Auth bypass, CSWSH, message injection, sensitive data exposure
+- **PDF Reports** - Professional PDF security reports with charts and executive summary
+- **Scheduled Scans** - Automate scans with cron-like scheduling (daily, weekly, interval)
 - **Proxy Support** - HTTP, HTTPS, SOCKS5 (including Tor)
 - **Custom Headers** - Add custom headers to all requests
 - **Stealth Mode** - WAF evasion with header rotation and jitter
@@ -136,6 +138,15 @@ janus graphql-analyze --url https://api.example.com/graphql
 
 # WebSocket Testing
 janus websocket --url wss://example.com/ws --token <token>
+
+# PDF Report Generation
+janus report-pdf --input report.json --output security_report.pdf
+
+# Scheduled Scans
+janus schedule list                                    # List all schedules
+janus schedule add --name "Daily Scan" --url https://api.example.com --type daily
+janus schedule run --id <schedule_id>                   # Run immediately
+janus schedule start                                    # Start scheduler daemon
 ```
 
 ## Proxy & Custom Headers

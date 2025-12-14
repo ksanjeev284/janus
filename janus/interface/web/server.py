@@ -1633,6 +1633,122 @@ async def test_websocket(url: str = Form(...), token: str = Form(""), origin: st
         return {"error": str(e)}
 
 
+# ================== PHASE 3: REPORTING & SCHEDULING ==================
+
+@app.post("/api/report/pdf")
+async def generate_pdf_report(scan_id: str = Form("")):
+    """Generate PDF report from scan results."""
+    try:
+        from janus.reporting.pdf_generator import PDFReportGenerator
+        
+        # Get scan data
+        if scan_id and scan_id in autoscan_reports:
+            report_data = autoscan_reports[scan_id].to_dict()
+        elif autoscan_reports:
+            # Use latest scan
+            report_data = list(autoscan_reports.values())[-1].to_dict()
+        elif scan_results:
+            report_data = list(scan_results.values())[-1].to_dict()
+        else:
+            return {"error": "No scan results available"}
+        
+        # Generate PDF
+        import tempfile
+        import os
+        
+        pdf_path = os.path.join(tempfile.gettempdir(), f"janus_report_{scan_id or 'latest'}.pdf")
+        generator = PDFReportGenerator()
+        generator.generate(report_data, pdf_path)
+        
+        return FileResponse(pdf_path, filename="janus_security_report.pdf", media_type="application/pdf")
+    except ImportError:
+        return {"error": "reportlab is required. Install with: pip install reportlab"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/api/schedules")
+async def list_schedules():
+    """List all scheduled scans."""
+    try:
+        from janus.core.scheduler import ScanScheduler
+        scheduler = ScanScheduler()
+        schedules = scheduler.list_schedules()
+        return {
+            "schedules": [s.to_dict() for s in schedules],
+            "history": [h.to_dict() for h in scheduler.get_history(10)]
+        }
+    except ImportError:
+        return {"error": "apscheduler is required. Install with: pip install apscheduler"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.post("/api/schedules")
+async def add_schedule(
+    name: str = Form(...),
+    url: str = Form(...),
+    schedule_type: str = Form("daily"),
+    interval_hours: int = Form(24),
+    modules: str = Form(""),
+    webhook: str = Form("")
+):
+    """Add a new scheduled scan."""
+    try:
+        from janus.core.scheduler import ScanScheduler, create_schedule
+        
+        module_list = [m.strip() for m in modules.split(",")] if modules else []
+        
+        schedule = create_schedule(
+            name=name,
+            target_url=url,
+            schedule_type=schedule_type,
+            interval_hours=interval_hours,
+            modules=module_list,
+            notify_webhook=webhook
+        )
+        
+        scheduler = ScanScheduler()
+        scheduler.add_schedule(schedule)
+        
+        return {"success": True, "schedule": schedule.to_dict()}
+    except ImportError:
+        return {"error": "apscheduler is required. Install with: pip install apscheduler"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.delete("/api/schedules/{schedule_id}")
+async def remove_schedule(schedule_id: str):
+    """Remove a scheduled scan."""
+    try:
+        from janus.core.scheduler import ScanScheduler
+        scheduler = ScanScheduler()
+        
+        if scheduler.remove_schedule(schedule_id):
+            return {"success": True, "message": f"Schedule {schedule_id} removed"}
+        else:
+            return {"error": f"Schedule {schedule_id} not found"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.post("/api/schedules/{schedule_id}/run")
+async def run_schedule_now(schedule_id: str):
+    """Run a scheduled scan immediately."""
+    try:
+        from janus.core.scheduler import ScanScheduler
+        scheduler = ScanScheduler()
+        
+        result = scheduler.run_now(schedule_id)
+        if result:
+            return result.to_dict()
+        else:
+            return {"error": f"Schedule {schedule_id} not found"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
 @app.get("/v2")
 async def dashboard_v2():
     """Render the new modern dashboard."""

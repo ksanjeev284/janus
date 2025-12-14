@@ -194,6 +194,9 @@ def get_modern_dashboard_html(tokens: list) -> str:
             <!-- Settings Category -->
             <div class="px-4">
                 <h3 class="category-header text-gray-500 uppercase font-semibold mb-2 px-3">⚙️ Settings</h3>
+                <button onclick="showPanel('scheduler')" class="sidebar-item w-full text-left px-3 py-2 rounded-lg text-sm border-l-2 border-transparent flex items-center gap-2">
+                    <span class="text-cyber-green">⏰</span> Scheduler
+                </button>
                 <button onclick="showPanel('settings')" class="sidebar-item w-full text-left px-3 py-2 rounded-lg text-sm border-l-2 border-transparent flex items-center gap-2">
                     <span class="text-gray-400">🔌</span> Proxy & Headers
                 </button>
@@ -470,6 +473,45 @@ def get_modern_dashboard_html(tokens: list) -> str:
                     </form>
                 </div>
                 
+                <!-- Scheduler Panel -->
+                <div id="panel-scheduler" class="bg-dark-800 rounded-2xl p-6 border border-dark-600 card-glow-green hidden">
+                    <div class="mb-4 p-3 bg-gradient-to-r from-green-500/20 to-cyan-500/20 rounded-xl border border-green-500/30">
+                        <h3 class="font-bold text-green-400 flex items-center gap-2">⏰ Scheduled Scans</h3>
+                        <p class="text-xs text-gray-400 mt-1">Automate security scans on a schedule</p>
+                    </div>
+                    <form id="schedulerForm" class="space-y-4">
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-2">Schedule Name</label>
+                            <input type="text" name="name" placeholder="Daily Production Scan" class="w-full px-4 py-3 bg-dark-900 border border-dark-600 rounded-xl mono text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-2">Target URL</label>
+                            <input type="text" name="url" placeholder="https://api.example.com" class="w-full px-4 py-3 bg-dark-900 border border-dark-600 rounded-xl mono text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-2">Schedule Type</label>
+                            <select name="schedule_type" class="w-full px-4 py-3 bg-dark-900 border border-dark-600 rounded-xl text-sm">
+                                <option value="daily">Daily</option>
+                                <option value="weekly">Weekly</option>
+                                <option value="interval">Interval (hours)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-2">Interval Hours</label>
+                            <input type="number" name="interval_hours" value="24" class="w-full px-4 py-3 bg-dark-900 border border-dark-600 rounded-xl mono text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-2">Webhook URL (optional)</label>
+                            <input type="text" name="webhook" placeholder="https://discord.com/api/webhooks/..." class="w-full px-4 py-3 bg-dark-900 border border-dark-600 rounded-xl mono text-sm">
+                        </div>
+                        <div class="flex gap-2">
+                            <button type="submit" class="flex-1 py-3 gradient-green rounded-xl font-semibold text-white">➕ Add Schedule</button>
+                            <button type="button" onclick="loadSchedules()" class="flex-1 py-3 bg-dark-700 hover:bg-dark-600 rounded-xl font-semibold">📋 View All</button>
+                        </div>
+                    </form>
+                    <div id="schedulesLista" class="mt-4 text-xs text-gray-500"></div>
+                </div>
+                
                 <!-- Placeholder panels for other modules -->
                 <div id="panel-bfla" class="bg-dark-800 rounded-2xl p-6 border border-dark-600 hidden">
                     <form id="bflaForm" class="space-y-4">
@@ -701,6 +743,7 @@ def get_modern_dashboard_html(tokens: list) -> str:
             'graphql': ['GraphQL Analyzer', 'Introspection, sensitive fields, depth limits'],
             'ssti': ['SSTI Scanner', 'Server-Side Template Injection (9 engines)'],
             'websocket': ['WebSocket Tester', 'Auth bypass, CSWSH, message injection'],
+            'scheduler': ['Scheduled Scans', 'Automate security scans on a schedule'],
             'settings': ['Settings', 'Proxy, custom headers, and SSL configuration']
         }};
         

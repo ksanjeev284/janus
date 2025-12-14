@@ -1528,6 +1528,199 @@ def websocket(
             console.print("[yellow]Install websockets: pip install websockets[/yellow]")
 
 
+# =============================================================================
+# PHASE 3: REPORTING & SCHEDULING
+# =============================================================================
+
+@app.command("report-pdf")
+def report_pdf(
+    input_file: Path = typer.Option("janus_report.json", "--input", "-i", help="Input JSON report file"),
+    output: Path = typer.Option("janus_report.pdf", "--output", "-o", help="Output PDF file"),
+    title: str = typer.Option("Janus Security Report", "--title", "-t", help="Report title"),
+    company: str = typer.Option("", "--company", "-c", help="Company name"),
+):
+    """
+    📄 Generate a professional PDF security report.
+    
+    Requires: pip install reportlab
+    """
+    print_banner()
+    
+    try:
+        from janus.reporting.pdf_generator import PDFReportGenerator, PDFReportConfig
+    except ImportError:
+        console.print("[red]Error: reportlab is required. Install with: pip install reportlab[/red]")
+        raise typer.Exit(1)
+    
+    if not input_file.exists():
+        console.print(f"[red]Report file not found: {input_file}[/red]")
+        raise typer.Exit(1)
+    
+    with open(input_file, 'r') as f:
+        scan_report = json.load(f)
+    
+    console.print(f"[cyan]Generating PDF report...[/cyan]")
+    
+    config = PDFReportConfig(
+        title=title,
+        company_name=company
+    )
+    
+    generator = PDFReportGenerator(config)
+    output_path = generator.generate(scan_report, str(output))
+    
+    console.print(f"[green]✓ PDF report saved to {output_path}[/green]")
+
+
+@app.command("schedule")
+def schedule_cmd(
+    action: str = typer.Argument("list", help="Action: list, add, remove, run, start, stop"),
+    name: str = typer.Option("", "--name", "-n", help="Schedule name"),
+    url: str = typer.Option("", "--url", "-u", help="Target URL"),
+    interval: int = typer.Option(24, "--interval", "-i", help="Interval in hours"),
+    schedule_type: str = typer.Option("daily", "--type", "-t", help="Schedule type: daily, weekly, interval, cron"),
+    modules: str = typer.Option("", "--modules", "-m", help="Comma-separated modules to run"),
+    webhook: str = typer.Option("", "--webhook", help="Webhook URL for notifications"),
+    schedule_id: str = typer.Option("", "--id", help="Schedule ID for remove/run actions"),
+):
+    """
+    ⏰ Manage scheduled security scans.
+    
+    Actions:
+    - list: Show all scheduled scans
+    - add: Create a new scheduled scan
+    - remove: Remove a schedule by ID
+    - run: Run a schedule immediately
+    - start: Start the scheduler daemon
+    - stop: Stop the scheduler daemon
+    
+    Requires: pip install apscheduler
+    """
+    print_banner()
+    
+    try:
+        from janus.core.scheduler import ScanScheduler, create_schedule
+    except ImportError:
+        console.print("[red]Error: apscheduler is required. Install with: pip install apscheduler[/red]")
+        raise typer.Exit(1)
+    
+    scheduler = ScanScheduler()
+    
+    if action == "list":
+        schedules = scheduler.list_schedules()
+        
+        if not schedules:
+            console.print("[yellow]No scheduled scans configured.[/yellow]")
+            console.print("[dim]Use 'janus schedule add --name <name> --url <url>' to create one.[/dim]")
+            return
+        
+        table = Table(title="Scheduled Scans")
+        table.add_column("ID", style="cyan")
+        table.add_column("Name", style="bold")
+        table.add_column("Target")
+        table.add_column("Type")
+        table.add_column("Status")
+        table.add_column("Last Run")
+        
+        for s in schedules:
+            status = "[green]Enabled[/green]" if s.enabled else "[dim]Disabled[/dim]"
+            last_run = s.last_run[:16] if s.last_run else "Never"
+            table.add_row(
+                s.id,
+                s.name,
+                s.target_url[:40] + "..." if len(s.target_url) > 40 else s.target_url,
+                f"{s.schedule_type} ({s.interval_hours}h)" if s.schedule_type == "interval" else s.schedule_type,
+                status,
+                last_run
+            )
+        
+        console.print(table)
+        
+        # Show history
+        history = scheduler.get_history(5)
+        if history:
+            console.print("\n[bold]Recent Scan History:[/bold]")
+            for h in reversed(history):
+                status = "[green]✓[/green]" if h.success else "[red]✗[/red]"
+                console.print(f"  {status} {h.schedule_name} - {h.findings_count} findings ({h.start_time[:16]})")
+    
+    elif action == "add":
+        if not name or not url:
+            console.print("[red]Error: --name and --url are required for adding a schedule[/red]")
+            raise typer.Exit(1)
+        
+        module_list = [m.strip() for m in modules.split(",")] if modules else []
+        
+        schedule = create_schedule(
+            name=name,
+            target_url=url,
+            schedule_type=schedule_type,
+            interval_hours=interval,
+            modules=module_list,
+            notify_webhook=webhook
+        )
+        
+        scheduler.add_schedule(schedule)
+        
+        console.print(f"[green]✓ Schedule created: {schedule.id}[/green]")
+        console.print(f"  Name: {schedule.name}")
+        console.print(f"  Target: {schedule.target_url}")
+        console.print(f"  Type: {schedule.schedule_type}")
+        console.print(f"\n[dim]Run 'janus schedule start' to start the scheduler daemon.[/dim]")
+    
+    elif action == "remove":
+        if not schedule_id:
+            console.print("[red]Error: --id is required for remove action[/red]")
+            raise typer.Exit(1)
+        
+        if scheduler.remove_schedule(schedule_id):
+            console.print(f"[green]✓ Schedule {schedule_id} removed[/green]")
+        else:
+            console.print(f"[red]Schedule {schedule_id} not found[/red]")
+    
+    elif action == "run":
+        if not schedule_id:
+            console.print("[red]Error: --id is required for run action[/red]")
+            raise typer.Exit(1)
+        
+        console.print(f"[cyan]Running scheduled scan: {schedule_id}...[/cyan]")
+        result = scheduler.run_now(schedule_id)
+        
+        if result:
+            if result.success:
+                console.print(f"[green]✓ Scan complete: {result.findings_count} findings[/green]")
+                console.print(f"  Report: {result.report_path}")
+            else:
+                console.print(f"[red]✗ Scan failed: {result.error}[/red]")
+        else:
+            console.print(f"[red]Schedule {schedule_id} not found[/red]")
+    
+    elif action == "start":
+        console.print("[cyan]Starting scheduler daemon...[/cyan]")
+        
+        if scheduler.start():
+            console.print("[green]✓ Scheduler started[/green]")
+            console.print("[dim]Press Ctrl+C to stop[/dim]")
+            
+            try:
+                while True:
+                    import time
+                    time.sleep(60)
+            except KeyboardInterrupt:
+                scheduler.stop()
+                console.print("\n[yellow]Scheduler stopped[/yellow]")
+        else:
+            console.print("[red]Failed to start scheduler. Install apscheduler: pip install apscheduler[/red]")
+    
+    elif action == "stop":
+        scheduler.stop()
+        console.print("[green]✓ Scheduler stopped[/green]")
+    
+    else:
+        console.print(f"[red]Unknown action: {action}[/red]")
+        console.print("[dim]Available actions: list, add, remove, run, start, stop[/dim]")
+
+
 def main():
     app()
 
