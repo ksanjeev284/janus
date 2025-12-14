@@ -194,6 +194,9 @@ def get_modern_dashboard_html(tokens: list) -> str:
             <!-- Settings Category -->
             <div class="px-4">
                 <h3 class="category-header text-gray-500 uppercase font-semibold mb-2 px-3">⚙️ Settings</h3>
+                <button onclick="showPanel('reports')" class="sidebar-item w-full text-left px-3 py-2 rounded-lg text-sm border-l-2 border-transparent flex items-center gap-2">
+                    <span class="text-cyber-accent">📊</span> Reports
+                </button>
                 <button onclick="showPanel('scheduler')" class="sidebar-item w-full text-left px-3 py-2 rounded-lg text-sm border-l-2 border-transparent flex items-center gap-2">
                     <span class="text-cyber-green">⏰</span> Scheduler
                 </button>
@@ -512,6 +515,52 @@ def get_modern_dashboard_html(tokens: list) -> str:
                     <div id="schedulesLista" class="mt-4 text-xs text-gray-500"></div>
                 </div>
                 
+                <!-- Reports Panel -->
+                <div id="panel-reports" class="bg-dark-800 rounded-2xl p-6 border border-dark-600 card-glow-accent hidden">
+                    <div class="mb-4 p-3 bg-gradient-to-r from-pink-500/20 to-purple-500/20 rounded-xl border border-pink-500/30">
+                        <h3 class="font-bold text-pink-400 flex items-center gap-2">📊 Report Manager</h3>
+                        <p class="text-xs text-gray-400 mt-1">View, export, and manage all scan reports</p>
+                    </div>
+                    
+                    <!-- Stats Cards -->
+                    <div id="reportStats" class="grid grid-cols-4 gap-3 mb-4">
+                        <div class="bg-dark-900 rounded-xl p-3 text-center border border-dark-600">
+                            <div class="text-2xl font-bold text-white" id="statTotalReports">0</div>
+                            <div class="text-xs text-gray-500">Reports</div>
+                        </div>
+                        <div class="bg-dark-900 rounded-xl p-3 text-center border border-dark-600">
+                            <div class="text-2xl font-bold text-red-400" id="statCritical">0</div>
+                            <div class="text-xs text-gray-500">Critical</div>
+                        </div>
+                        <div class="bg-dark-900 rounded-xl p-3 text-center border border-dark-600">
+                            <div class="text-2xl font-bold text-yellow-400" id="statHigh">0</div>
+                            <div class="text-xs text-gray-500">High</div>
+                        </div>
+                        <div class="bg-dark-900 rounded-xl p-3 text-center border border-dark-600">
+                            <div class="text-2xl font-bold text-blue-400" id="statTargets">0</div>
+                            <div class="text-xs text-gray-500">Targets</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Action Bar -->
+                    <div class="flex gap-2 mb-4">
+                        <button onclick="loadReports()" class="flex-1 py-2 bg-dark-700 hover:bg-dark-600 rounded-xl text-sm font-medium flex items-center justify-center gap-2">
+                            🔄 Refresh
+                        </button>
+                        <button onclick="exportLatestReport('pdf')" class="flex-1 py-2 gradient-accent rounded-xl text-sm font-medium text-white flex items-center justify-center gap-2">
+                            📄 Export Latest PDF
+                        </button>
+                    </div>
+                    
+                    <!-- Reports List -->
+                    <div id="reportsList" class="space-y-2 max-h-96 overflow-y-auto">
+                        <div class="text-center text-gray-500 py-8">
+                            <div class="text-3xl mb-2">📭</div>
+                            <p>No reports yet. Run a scan to generate reports.</p>
+                        </div>
+                    </div>
+                </div>
+                
                 <!-- Placeholder panels for other modules -->
                 <div id="panel-bfla" class="bg-dark-800 rounded-2xl p-6 border border-dark-600 hidden">
                     <form id="bflaForm" class="space-y-4">
@@ -743,6 +792,7 @@ def get_modern_dashboard_html(tokens: list) -> str:
             'graphql': ['GraphQL Analyzer', 'Introspection, sensitive fields, depth limits'],
             'ssti': ['SSTI Scanner', 'Server-Side Template Injection (9 engines)'],
             'websocket': ['WebSocket Tester', 'Auth bypass, CSWSH, message injection'],
+            'reports': ['Report Manager', 'View, export, and manage all scan reports'],
             'scheduler': ['Scheduled Scans', 'Automate security scans on a schedule'],
             'settings': ['Settings', 'Proxy, custom headers, and SSL configuration']
         }};
@@ -833,6 +883,104 @@ def get_modern_dashboard_html(tokens: list) -> str:
         function testProxy() {{
             alert('Testing proxy connection...');
         }}
+        
+        // Report Management Functions
+        async function loadReports() {{
+            try {{
+                const response = await fetch('/api/reports');
+                const data = await response.json();
+                
+                if (data.error) {{
+                    document.getElementById('reportsList').innerHTML = `<div class="text-red-400 p-4">${{data.error}}</div>`;
+                    return;
+                }}
+                
+                // Update stats
+                if (data.stats) {{
+                    document.getElementById('statTotalReports').textContent = data.stats.total_reports || 0;
+                    document.getElementById('statCritical').textContent = data.stats.critical_total || 0;
+                    document.getElementById('statHigh').textContent = data.stats.high_total || 0;
+                    document.getElementById('statTargets').textContent = data.stats.targets_scanned || 0;
+                }}
+                
+                // Render reports list
+                const reports = data.reports || [];
+                if (reports.length === 0) {{
+                    document.getElementById('reportsList').innerHTML = `
+                        <div class="text-center text-gray-500 py-8">
+                            <div class="text-3xl mb-2">📭</div>
+                            <p>No reports yet. Run a scan to generate reports.</p>
+                        </div>`;
+                    return;
+                }}
+                
+                let html = '';
+                reports.forEach(r => {{
+                    const sevBadge = r.critical_count > 0 ? 'bg-red-500' : 
+                                     r.high_count > 0 ? 'bg-yellow-500' : 
+                                     r.medium_count > 0 ? 'bg-blue-500' : 'bg-gray-500';
+                    const findings = r.total_findings || 0;
+                    const dateStr = r.created_at ? r.created_at.substring(0, 16).replace('T', ' ') : 'Unknown';
+                    
+                    html += `
+                    <div class="bg-dark-900 rounded-xl p-3 border border-dark-600 hover:border-dark-500 transition-all group">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-3 flex-1 min-w-0">
+                                <div class="w-2 h-2 ${{sevBadge}} rounded-full"></div>
+                                <div class="truncate">
+                                    <div class="font-medium text-sm truncate">${{r.target_url || 'Unknown'}}</div>
+                                    <div class="text-xs text-gray-500">${{dateStr}} • ${{findings}} findings</div>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onclick="exportReport('${{r.id}}', 'html')" class="p-1.5 hover:bg-dark-700 rounded-lg text-xs" title="HTML">📄</button>
+                                <button onclick="exportReport('${{r.id}}', 'pdf')" class="p-1.5 hover:bg-dark-700 rounded-lg text-xs" title="PDF">📕</button>
+                                <button onclick="exportReport('${{r.id}}', 'json')" class="p-1.5 hover:bg-dark-700 rounded-lg text-xs" title="JSON">📜</button>
+                                <button onclick="deleteReport('${{r.id}}')" class="p-1.5 hover:bg-red-900/50 rounded-lg text-xs text-red-400" title="Delete">🗑️</button>
+                            </div>
+                        </div>
+                    </div>`;
+                }});
+                
+                document.getElementById('reportsList').innerHTML = html;
+            }} catch (err) {{
+                document.getElementById('reportsList').innerHTML = `<div class="text-red-400 p-4">Failed to load: ${{err.message}}</div>`;
+            }}
+        }}
+        
+        function exportReport(reportId, format) {{
+            window.open(`/api/reports/${{reportId}}/export?format=${{format}}`, '_blank');
+        }}
+        
+        function exportLatestReport(format) {{
+            fetch('/api/reports?limit=1')
+                .then(r => r.json())
+                .then(data => {{
+                    if (data.reports && data.reports.length > 0) {{
+                        exportReport(data.reports[0].id, format);
+                    }} else {{
+                        alert('No reports available to export');
+                    }}
+                }});
+        }}
+        
+        async function deleteReport(reportId) {{
+            if (!confirm('Delete this report?')) return;
+            
+            try {{
+                await fetch(`/api/reports/${{reportId}}`, {{ method: 'DELETE' }});
+                loadReports();
+            }} catch (err) {{
+                alert('Failed to delete: ' + err.message);
+            }}
+        }}
+        
+        // Auto-load reports when panel is shown
+        const origShowPanel = showPanel;
+        showPanel = function(panelId) {{
+            origShowPanel(panelId);
+            if (panelId === 'reports') loadReports();
+        }};
     </script>
 </body>
 </html>

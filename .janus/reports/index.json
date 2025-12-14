@@ -1,1 +1,16 @@
-{}
+{
+  "scan_1765692383": {
+    "id": "scan_1765692383",
+    "target_url": "https://www.ctccalculator.in/",
+    "scan_type": "autoscan",
+    "created_at": "2025-12-14T11:36:49.937327",
+    "total_findings": 10,
+    "critical_count": 0,
+    "high_count": 2,
+    "medium_count": 0,
+    "low_count": 0,
+    "duration_seconds": 26.26702332496643,
+    "tags": [],
+    "notes": ""
+  }
+}

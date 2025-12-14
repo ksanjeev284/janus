@@ -1,0 +1,133 @@
+{
+  "target_url": "https://www.ctccalculator.in/",
+  "scan_id": "scan_1765692383",
+  "scan_time": "2025-12-14T11:36:49.936328",
+  "duration_seconds": 26.26702332496643,
+  "total_modules": 6,
+  "completed_modules": 6,
+  "failed_modules": 0,
+  "total_findings": 10,
+  "critical_count": 0,
+  "high_count": 2,
+  "medium_count": 0,
+  "low_count": 0,
+  "results": [
+    {
+      "module": "Security Headers",
+      "category": "Configuration",
+      "status": "success",
+      "vulnerable": true,
+      "severity": "HIGH",
+      "findings_count": 9,
+      "findings": [
+        {
+          "header": "Strict-Transport-Security",
+          "status": "MISCONFIGURED",
+          "description": "Consider adding includeSubDomains"
+        },
+        {
+          "header": "Content-Security-Policy",
+          "status": "MISSING",
+          "description": "Add header: Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'"
+        },
+        {
+          "header": "X-Content-Type-Options",
+          "status": "MISSING",
+          "description": "Add header: X-Content-Type-Options: nosniff"
+        },
+        {
+          "header": "X-Frame-Options",
+          "status": "MISSING",
+          "description": "Add header: X-Frame-Options: DENY or SAMEORIGIN"
+        },
+        {
+          "header": "X-XSS-Protection",
+          "status": "MISSING",
+          "description": "Add header: X-XSS-Protection: 1; mode=block"
+        },
+        {
+          "header": "Referrer-Policy",
+          "status": "MISSING",
+          "description": "Add header: Referrer-Policy: strict-origin-when-cross-origin"
+        },
+        {
+          "header": "Permissions-Policy",
+          "status": "MISSING",
+          "description": "Add header: Permissions-Policy: geolocation=(), camera=(), microphone=()"
+        },
+        {
+          "header": "Cache-Control",
+          "status": "MISCONFIGURED",
+          "description": "Consider 'no-store' for sensitive data"
+        },
+        {
+          "header": "X-Permitted-Cross-Domain-Policies",
+          "status": "MISSING",
+          "description": "Add header: X-Permitted-Cross-Domain-Policies: none"
+        }
+      ],
+      "duration_ms": 595.7558155059814,
+      "error": null
+    },
+    {
+      "module": "CORS",
+      "category": "Configuration",
+      "status": "success",
+      "vulnerable": false,
+      "severity": "MEDIUM",
+      "findings_count": 0,
+      "findings": [],
+      "duration_ms": 5238.739490509033,
+      "error": null
+    },
+    {
+      "module": "Sensitive Files",
+      "category": "Reconnaissance",
+      "status": "success",
+      "vulnerable": false,
+      "severity": "INFO",
+      "findings_count": 0,
+      "findings": [],
+      "duration_ms": 2241.03045463562,
+      "error": null
+    },
+    {
+      "module": "Tech Fingerprint",
+      "category": "Reconnaissance",
+      "status": "success",
+      "vulnerable": false,
+      "severity": "INFO",
+      "findings_count": 0,
+      "findings": [],
+      "duration_ms": 517.7242755889893,
+      "error": null
+    },
+    {
+      "module": "Open Redirect",
+      "category": "Injection",
+      "status": "success",
+      "vulnerable": false,
+      "severity": "MEDIUM",
+      "findings_count": 0,
+      "findings": [],
+      "duration_ms": 15984.294176101685,
+      "error": null
+    },
+    {
+      "module": "Rate Limiting",
+      "category": "Configuration",
+      "status": "success",
+      "vulnerable": true,
+      "severity": "HIGH",
+      "findings_count": 1,
+      "findings": [
+        {
+          "evidence": "No rate limiting detected after 20 requests. All 20 requests succeeded.",
+          "recommendation": "Implement rate limiting using a token bucket or sliding window algorithm. Recommended: 100 requests per minute for most APIs."
+        }
+      ],
+      "duration_ms": 1689.479112625122,
+      "error": null
+    }
+  ]
+}
