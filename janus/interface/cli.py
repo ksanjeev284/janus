@@ -1,11 +1,11 @@
 # janus/interface/cli.py
 """
 Janus CLI - Beautiful command-line interface using Typer and Rich.
-Now with CVE lookup, Shadow API detection, and GraphQL attacks.
+Now with CVE lookup, Shadow API detection, GraphQL attacks, and proxy support.
 """
 
 import typer
-from typing import Optional
+from typing import Optional, List
 from pathlib import Path
 import json
 import sys
@@ -22,6 +22,7 @@ from rich import print as rprint
 
 from janus.core.engine import JanusEngine
 from janus.core.database import JanusDatabase
+from janus.core.http_client import JanusHTTPClient, ProxyConfig, RequestConfig
 from janus.recon.cve_lookup import CVELookup
 from janus.recon.shadow import ShadowAPIDetector
 from janus.attack.graphql import GraphQLAttacker
@@ -35,6 +36,9 @@ app = typer.Typer(
     add_completion=False
 )
 console = Console()
+
+# Global HTTP client instance (configured via CLI options)
+http_client: Optional[JanusHTTPClient] = None
 
 BANNER = """
 [bold red]
@@ -51,6 +55,74 @@ BANNER = """
 
 def print_banner():
     console.print(BANNER)
+
+
+def setup_http_client(
+    proxy: Optional[str] = None,
+    headers: Optional[List[str]] = None,
+    no_verify: bool = False,
+    timeout: int = 30
+) -> JanusHTTPClient:
+    """
+    Setup and configure the HTTP client with proxy and custom headers.
+    
+    Args:
+        proxy: Proxy URL (e.g., http://host:port, socks5://host:port)
+        headers: List of custom headers in "Name: Value" format
+        no_verify: Disable SSL certificate verification
+        timeout: Request timeout in seconds
+    
+    Returns:
+        Configured JanusHTTPClient instance
+    """
+    global http_client
+    
+    # Create proxy config
+    proxy_config = ProxyConfig(enabled=False)
+    if proxy:
+        proxy_config.enabled = True
+        proxy_lower = proxy.lower()
+        if proxy_lower.startswith("socks"):
+            proxy_config.socks_proxy = proxy
+        elif proxy_lower.startswith("https"):
+            proxy_config.https_proxy = proxy
+        else:
+            proxy_config.http_proxy = proxy
+            proxy_config.https_proxy = proxy
+    
+    # Create request config
+    request_config = RequestConfig(
+        timeout=timeout,
+        verify_ssl=not no_verify
+    )
+    
+    # Create client
+    http_client = JanusHTTPClient(proxy_config, request_config)
+    
+    # Add custom headers
+    if headers:
+        for header in headers:
+            if ":" in header:
+                name, value = header.split(":", 1)
+                http_client.add_global_header(name.strip(), value.strip())
+    
+    # Log configuration
+    if proxy:
+        console.print(f"[dim]Using proxy: {proxy}[/dim]")
+    if headers:
+        console.print(f"[dim]Custom headers: {len(headers)}[/dim]")
+    if no_verify:
+        console.print(f"[yellow]SSL verification disabled[/yellow]")
+    
+    return http_client
+
+
+def get_http_client() -> JanusHTTPClient:
+    """Get the global HTTP client or create a default one."""
+    global http_client
+    if http_client is None:
+        http_client = JanusHTTPClient()
+    return http_client
 
 
 @app.command()
@@ -810,10 +882,84 @@ def ci_scan(
         raise typer.Exit(0)
 
 
+@app.command()
+def ssrf(
+    endpoint: str = typer.Option(..., "--endpoint", "-e", help="Target endpoint URL"),
+    param: str = typer.Option(..., "--param", "-p", help="URL parameter name to test"),
+    token: str = typer.Option(None, "--token", "-t", help="Authorization token"),
+    quick: bool = typer.Option(False, "--quick", "-q", help="Quick scan with critical payloads only"),
+    category: str = typer.Option(None, "--category", "-c", help="Filter by category: internal, cloud_metadata, file, bypass"),
+):
+    """
+    🌐 Test for SSRF (Server-Side Request Forgery) vulnerabilities.
+    
+    Tests endpoints that accept URLs for SSRF by injecting payloads
+    targeting internal networks, cloud metadata, and more.
+    """
+    print_banner()
+    
+    from janus.attack.ssrf import SSRFTester
+    
+    console.print(f"[cyan]Testing SSRF on {endpoint}[/cyan]")
+    console.print(f"[dim]Parameter: {param}[/dim]\n")
+    
+    tester = SSRFTester()
+    
+    if quick:
+        results = tester.quick_scan(endpoint, param, token)
+    else:
+        categories = [category] if category else None
+        results = tester.test_endpoint(
+            endpoint=endpoint,
+            param_name=param,
+            token=token,
+            categories=categories
+        )
+    
+    # Display results
+    vulnerable = [r for r in results if r.vulnerable]
+    
+    if vulnerable:
+        console.print(f"[bold red]🚨 {len(vulnerable)} SSRF vulnerabilities found![/bold red]\n")
+        
+        table = Table(title="SSRF Findings")
+        table.add_column("Payload", style="cyan")
+        table.add_column("Category")
+        table.add_column("Severity", style="bold")
+        table.add_column("Evidence")
+        
+        for r in vulnerable:
+            sev_color = {"CRITICAL": "red", "HIGH": "yellow", "MEDIUM": "blue"}.get(r.severity, "dim")
+            table.add_row(
+                r.payload_name,
+                r.payload_value[:30] + "...",
+                f"[{sev_color}]{r.severity}[/{sev_color}]",
+                r.evidence[:50]
+            )
+        
+        console.print(table)
+        
+        # Show recommendations
+        console.print("\n[yellow]Recommendations:[/yellow]")
+        shown_recs = set()
+        for r in vulnerable:
+            if r.recommendation and r.recommendation not in shown_recs:
+                console.print(f"  • {r.recommendation}")
+                shown_recs.add(r.recommendation)
+    else:
+        console.print("[green]✓ No SSRF vulnerabilities detected[/green]")
+    
+    # Summary
+    report = tester.generate_report(results)
+    console.print(f"\n[dim]Tested: {report['total_tests']} payloads | "
+                  f"Critical: {report['critical_count']} | High: {report['high_count']}[/dim]")
+
+
 def main():
     app()
 
 
 if __name__ == "__main__":
     main()
+
 
