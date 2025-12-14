@@ -97,10 +97,18 @@ def get_modern_dashboard_html(tokens: list) -> str:
         
         <!-- Navigation -->
         <nav class="flex-1 overflow-y-auto py-4">
+            <!-- Auto Scan - Full Assessment -->
+            <div class="px-4 mb-4">
+                <h3 class="category-header text-gray-500 uppercase font-semibold mb-2 px-3">🎯 Full Scan</h3>
+                <button onclick="showPanel('autoscan')" class="sidebar-item active w-full text-left px-3 py-2 rounded-lg text-sm border-l-2 border-transparent flex items-center gap-2 bg-gradient-to-r from-accent/20 to-transparent">
+                    <span class="text-accent">🚀</span> <strong>Auto Scanner</strong>
+                </button>
+            </div>
+            
             <!-- Authorization Category -->
             <div class="px-4 mb-4">
                 <h3 class="category-header text-gray-500 uppercase font-semibold mb-2 px-3">🔐 Authorization</h3>
-                <button onclick="showPanel('bola')" class="sidebar-item active w-full text-left px-3 py-2 rounded-lg text-sm border-l-2 border-transparent flex items-center gap-2">
+                <button onclick="showPanel('bola')" class="sidebar-item w-full text-left px-3 py-2 rounded-lg text-sm border-l-2 border-transparent flex items-center gap-2">
                     <span class="text-accent">⚡</span> BOLA/IDOR
                 </button>
                 <button onclick="showPanel('bfla')" class="sidebar-item w-full text-left px-3 py-2 rounded-lg text-sm border-l-2 border-transparent flex items-center gap-2">
@@ -212,8 +220,54 @@ def get_modern_dashboard_html(tokens: list) -> str:
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <!-- Left Panel: Scan Form -->
             <div class="lg:col-span-1">
+                <!-- Auto Scan Panel -->
+                <div id="panel-autoscan" class="bg-dark-800 rounded-2xl p-6 border border-dark-600 card-glow">
+                    <div class="mb-4 p-3 bg-gradient-to-r from-accent/20 to-purple-500/20 rounded-xl border border-accent/30">
+                        <h3 class="font-bold text-accent flex items-center gap-2">🎯 Full Security Assessment</h3>
+                        <p class="text-xs text-gray-400 mt-1">Runs all applicable security tests automatically</p>
+                    </div>
+                    <form id="autoscanForm" class="space-y-4">
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-2">Target URL *</label>
+                            <input type="text" name="url" placeholder="https://example.com"
+                                   class="w-full px-4 py-3 bg-dark-900 border border-dark-600 rounded-xl mono text-sm focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-2">Parameter (for injection tests)</label>
+                            <input type="text" name="param" placeholder="Optional: id, q, search, file"
+                                   class="w-full px-4 py-3 bg-dark-900 border border-dark-600 rounded-xl mono text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-2">Auth Token (optional)</label>
+                            <input type="text" name="token" placeholder="Bearer token or API key"
+                                   class="w-full px-4 py-3 bg-dark-900 border border-dark-600 rounded-xl mono text-sm">
+                        </div>
+                        
+                        <!-- Module Selection -->
+                        <div class="p-3 bg-dark-900 rounded-xl border border-dark-600">
+                            <label class="block text-sm text-gray-400 mb-2">Modules to Run</label>
+                            <div class="grid grid-cols-2 gap-2 text-xs">
+                                <label class="flex items-center gap-1"><input type="checkbox" name="modules" value="security_headers" checked> 🛡️ Headers</label>
+                                <label class="flex items-center gap-1"><input type="checkbox" name="modules" value="cors" checked> 🔀 CORS</label>
+                                <label class="flex items-center gap-1"><input type="checkbox" name="modules" value="sensitive_files" checked> 📁 Files</label>
+                                <label class="flex items-center gap-1"><input type="checkbox" name="modules" value="fingerprint" checked> 🔬 Fingerprint</label>
+                                <label class="flex items-center gap-1"><input type="checkbox" name="modules" value="open_redirect" checked> ↩️ Redirect</label>
+                                <label class="flex items-center gap-1"><input type="checkbox" name="modules" value="rate_limit" checked> ⏱️ Rate Limit</label>
+                                <label class="flex items-center gap-1"><input type="checkbox" name="modules" value="sqli"> 🗄️ SQLi</label>
+                                <label class="flex items-center gap-1"><input type="checkbox" name="modules" value="xss"> 💥 XSS</label>
+                                <label class="flex items-center gap-1"><input type="checkbox" name="modules" value="lfi"> 📂 LFI</label>
+                            </div>
+                            <p class="text-[10px] text-gray-500 mt-2">* Injection tests (SQLi, XSS, LFI) require a parameter</p>
+                        </div>
+                        
+                        <button type="submit" class="btn-primary w-full py-4 gradient-accent rounded-xl font-bold text-white text-lg">
+                            🚀 Start Full Scan
+                        </button>
+                    </form>
+                </div>
+                
                 <!-- BOLA Panel -->
-                <div id="panel-bola" class="bg-dark-800 rounded-2xl p-6 border border-dark-600 card-glow">
+                <div id="panel-bola" class="bg-dark-800 rounded-2xl p-6 border border-dark-600 card-glow hidden">
                     <form id="bolaForm" class="space-y-4">
                         <div>
                             <label class="block text-sm text-gray-400 mb-2">Target API URL</label>
@@ -547,6 +601,7 @@ def get_modern_dashboard_html(tokens: list) -> str:
     <script>
         // Panel titles and descriptions
         const panelInfo = {{
+            'autoscan': ['🎯 Auto Scanner', 'Run all security tests automatically with one click'],
             'bola': ['BOLA/IDOR Scanner', 'Broken Object Level Authorization detection'],
             'bfla': ['BFLA Scanner', 'Broken Function Level Authorization testing'],
             'jwt': ['JWT Attacks', 'Token manipulation and weak secret detection'],

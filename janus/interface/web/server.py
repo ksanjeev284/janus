@@ -1559,6 +1559,69 @@ async def dashboard_v2():
     return HTMLResponse(get_modern_dashboard_html(tokens))
 
 
+# Store auto-scan reports
+autoscan_reports = {}
+
+
+@app.post("/api/autoscan")
+async def run_autoscan(
+    url: str = Form(...),
+    param: str = Form(""),
+    token: str = Form(""),
+    modules: list = Form([])
+):
+    """Run comprehensive auto-scan with all selected modules."""
+    try:
+        from janus.core.auto_scanner import AutoScanner
+        
+        scanner = AutoScanner(timeout=30)
+        report = scanner.scan(
+            url=url,
+            token=token if token else None,
+            param=param if param else None,
+            modules=modules if modules else None
+        )
+        
+        # Store for export
+        autoscan_reports[report.scan_id] = report
+        
+        return report.to_dict()
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/api/autoscan/report/{scan_id}")
+async def get_autoscan_report(scan_id: str, format: str = "json"):
+    """Get auto-scan report in various formats."""
+    if scan_id not in autoscan_reports:
+        return {"error": "Report not found"}
+    
+    report = autoscan_reports[scan_id]
+    
+    if format == "html":
+        return HTMLResponse(report.to_html())
+    else:
+        return report.to_dict()
+
+
+@app.get("/api/autoscan/export/{scan_id}")
+async def export_autoscan_report(scan_id: str):
+    """Download auto-scan report as HTML file."""
+    from fastapi.responses import Response
+    
+    if scan_id not in autoscan_reports:
+        return {"error": "Report not found"}
+    
+    report = autoscan_reports[scan_id]
+    html = report.to_html()
+    
+    return Response(
+        content=html,
+        media_type="text/html",
+        headers={"Content-Disposition": f"attachment; filename=janus_report_{scan_id}.html"}
+    )
+
+
 def run_server(host: str = "0.0.0.0", port: int = 8000):
     """Run the web server."""
     import uvicorn

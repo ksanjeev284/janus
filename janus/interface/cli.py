@@ -1317,6 +1317,69 @@ def fingerprint(
         console.print("[dim]No technologies detected[/dim]")
 
 
+@app.command("auto-scan")
+def auto_scan(
+    url: str = typer.Option(..., "--url", "-u", help="Target URL to scan"),
+    param: str = typer.Option(None, "--param", "-p", help="Parameter for injection tests"),
+    token: str = typer.Option(None, "--token", "-t", help="Authorization token"),
+    output: str = typer.Option(None, "--output", "-o", help="Export HTML report to file"),
+):
+    """
+    🎯 Run comprehensive automatic security scan.
+    
+    Executes all relevant security tests against a target URL.
+    """
+    print_banner()
+    
+    from janus.core.auto_scanner import AutoScanner
+    
+    console.print(f"[bold cyan]🎯 Starting Automatic Security Scan[/bold cyan]")
+    console.print(f"[dim]Target: {url}[/dim]")
+    if param:
+        console.print(f"[dim]Parameter: {param}[/dim]")
+    console.print()
+    
+    scanner = AutoScanner(timeout=30)
+    
+    # Progress display
+    with console.status("[cyan]Scanning...") as status:
+        report = scanner.scan(url, token, param)
+    
+    # Summary stats
+    console.print(f"\n[bold]Scan Complete in {report.duration_seconds:.1f}s[/bold]")
+    console.print(f"Modules: {report.completed_modules}/{report.total_modules}")
+    console.print()
+    
+    # Findings summary
+    if report.total_findings > 0:
+        console.print(f"[bold red]🚨 {report.total_findings} FINDINGS DETECTED[/bold red]\n")
+        
+        if report.critical_count > 0:
+            console.print(f"  [red]CRITICAL: {report.critical_count}[/red]")
+        if report.high_count > 0:
+            console.print(f"  [yellow]HIGH: {report.high_count}[/yellow]")
+        if report.medium_count > 0:
+            console.print(f"  [blue]MEDIUM: {report.medium_count}[/blue]")
+        if report.low_count > 0:
+            console.print(f"  [dim]LOW: {report.low_count}[/dim]")
+        
+        console.print("\n[bold]Findings by Module:[/bold]")
+        for r in report.results:
+            if r.vulnerable and r.findings_count > 0:
+                console.print(f"\n  [red]▸ {r.module}[/red] ({r.severity})")
+                for f in r.findings[:3]:
+                    desc = f.get('description', f.get('evidence', str(f)[:60]))
+                    console.print(f"    • {desc[:80]}")
+    else:
+        console.print("[green]✓ No vulnerabilities detected![/green]")
+    
+    # Export HTML
+    if output:
+        with open(output, 'w', encoding='utf-8') as f:
+            f.write(report.to_html())
+        console.print(f"\n[cyan]📄 Report exported to {output}[/cyan]")
+
+
 def main():
     app()
 
