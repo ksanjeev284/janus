@@ -321,16 +321,18 @@ class AutoScanner:
                 scanner = SensitiveFileScanner(timeout=self.timeout)
                 report = scanner.scan(url, token)
                 
+                # Only count HIGH confidence findings
+                verified_findings = [f for f in report.findings if f.confidence == 'HIGH']
                 severity = 'CRITICAL' if report.critical_findings > 0 else 'HIGH' if report.high_findings > 0 else 'MEDIUM'
                 
                 return ModuleResult(
                     module='Sensitive Files',
                     category='Reconnaissance',
                     status='success',
-                    vulnerable=report.files_found > 0,
-                    severity=severity,
-                    findings_count=report.files_found,
-                    findings=[f.to_dict() for f in report.findings],
+                    vulnerable=len(verified_findings) > 0,
+                    severity=severity if verified_findings else 'INFO',
+                    findings_count=len(verified_findings),
+                    findings=[f.to_dict() for f in verified_findings],
                     duration_ms=(time.time() - start) * 1000
                 )
             

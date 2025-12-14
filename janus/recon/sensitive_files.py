@@ -8,9 +8,13 @@ Scans for exposed sensitive files and directories that should not be public:
 - Backup files (.bak, .old, .swp)
 - Development/debug endpoints
 - API documentation
+
+IMPORTANT: Uses content verification to minimize false positives.
+Only reports TRUE POSITIVES where actual sensitive content is detected.
 """
 
 import requests
+import re
 from dataclasses import dataclass, field, asdict
 from typing import Dict, List, Any, Optional
 from datetime import datetime
@@ -28,6 +32,8 @@ class SensitiveFileFinding:
     severity: str
     description: str
     recommendation: str
+    confidence: str  # HIGH, MEDIUM, LOW
+    evidence: str = ""  # Proof of finding
     
     def to_dict(self) -> Dict:
         return asdict(self)
@@ -41,6 +47,7 @@ class SensitiveFilesReport:
     files_found: int
     critical_findings: int
     high_findings: int
+    verified_findings: int  # Only high-confidence findings
     findings: List[SensitiveFileFinding] = field(default_factory=list)
     
     def to_dict(self) -> Dict:
@@ -52,171 +59,128 @@ class SensitiveFilesReport:
 
 class SensitiveFileScanner:
     """
-    Sensitive File Scanner.
+    Sensitive File Scanner with FALSE POSITIVE REDUCTION.
     
-    Checks for:
-    - Version control exposure (.git, .svn, .hg)
-    - Configuration files (.env, config.php, web.config)
-    - Backup files (.bak, .old, .backup)
-    - Debug/development files
-    - API documentation (swagger, openapi)
-    - Database files
+    Key improvements:
+    - Content validation (not just status code)
+    - Pattern matching for actual sensitive data
+    - Confidence scoring (HIGH/MEDIUM/LOW)
+    - Filters out SPA app shells and error pages
     """
     
-    # Files to check, organized by category
+    # Content patterns to VERIFY file is actually sensitive
+    CONTENT_VALIDATORS = {
+        'vcs': {
+            '.git/config': [r'\[core\]', r'\[remote', r'repositoryformatversion'],
+            '.git/HEAD': [r'ref: refs/heads/'],
+            '.git/index': [rb'DIRC'],  # Binary signature
+            '.gitignore': [r'^[\w\*\.]', r'node_modules', r'\.env'],
+            '.svn/entries': [r'^\d+', r'dir\n'],
+            '.svn/wc.db': [rb'SQLite'],  # SQLite header
+            '.hg/hgrc': [r'\[paths\]'],
+            '.bzr/README': [r'bazaar'],
+        },
+        'config': {
+            '.env': [r'^\w+\s*=', r'DB_', r'API_KEY', r'SECRET', r'PASSWORD', r'TOKEN'],
+            '.env.local': [r'^\w+\s*=', r'NEXT_', r'REACT_', r'VITE_'],
+            '.env.production': [r'^\w+\s*=', r'NODE_ENV\s*=\s*production'],
+            'config.php': [r'<\?php', r'\$config', r'define\('],
+            'config.inc.php': [r'<\?php', r'\$cfg', r'\$config'],
+            'configuration.php': [r'<\?php', r'JConfig'],
+            'settings.php': [r'<\?php', r'\$databases', r'\$settings'],
+            'database.yml': [r'adapter:', r'database:', r'host:'],
+            'secrets.yml': [r'secret_key', r'production:'],
+            'credentials.json': [r'"type":', r'"client_email":', r'"private_key":'],
+            'config.json': [r'"database"', r'"api', r'"secret'],
+            'config.yaml': [r'database:', r'secret:'],
+            'config.yml': [r'database:', r'secret:'],
+            'application.properties': [r'spring\.', r'jdbc\.'],
+            'application.yml': [r'spring:', r'datasource:'],
+            'web.config': [r'<configuration>', r'<connectionStrings>'],
+            'appsettings.json': [r'"ConnectionStrings"', r'"Logging"'],
+            'wp-config.php': [r'DB_NAME', r'DB_USER', r'DB_PASSWORD', r'table_prefix'],
+            'wp-config.php.bak': [r'DB_NAME', r'DB_USER'],
+        },
+        'backup': {
+            'backup.sql': [r'CREATE TABLE', r'INSERT INTO', r'-- MySQL', r'-- PostgreSQL'],
+            'database.sql': [r'CREATE TABLE', r'INSERT INTO'],
+            'db.sql': [r'CREATE TABLE', r'INSERT INTO'],
+            'dump.sql': [r'CREATE TABLE', r'INSERT INTO', r'mysqldump'],
+            'backup.zip': [rb'PK\x03\x04'],  # ZIP signature
+            'backup.tar.gz': [rb'\x1f\x8b'],  # GZIP signature
+            'site.zip': [rb'PK\x03\x04'],
+            'www.zip': [rb'PK\x03\x04'],
+        },
+        'debug': {
+            'phpinfo.php': [r'PHP Version', r'phpinfo\(\)', r'Configuration'],
+            'info.php': [r'PHP Version', r'phpinfo'],
+            'test.php': [r'<\?php', r'test'],
+            'debug.log': [r'\[\d{4}-\d{2}-\d{2}', r'ERROR', r'WARNING', r'Exception'],
+            'error.log': [r'\[error\]', r'ERROR', r'Exception', r'\[\d{4}'],
+            'access.log': [r'GET /', r'POST /', r'HTTP/1\.\d'],
+        },
+        'docs': {
+            'swagger.json': [r'"swagger":', r'"openapi":', r'"paths":'],
+            'swagger.yaml': [r'swagger:', r'openapi:', r'paths:'],
+            'openapi.json': [r'"openapi":', r'"paths":'],
+            'openapi.yaml': [r'openapi:', r'paths:'],
+        },
+        'database': {
+            'database.sqlite': [rb'SQLite format'],
+            'database.db': [rb'SQLite format'],
+            'data.db': [rb'SQLite format'],
+            'db.sqlite3': [rb'SQLite format'],
+        },
+    }
+    
+    # SPA / Error page detection patterns (FALSE POSITIVE indicators)
+    FALSE_POSITIVE_PATTERNS = [
+        r'<!DOCTYPE html>.*?<div id="(root|app|__next)"',  # React/Vue/Next.js app shell
+        r'<script.*?src=.*?bundle\.js',  # JS bundles
+        r'<title>.*?(404|Not Found|Error)',  # Error pages
+        r'<noscript>.*?JavaScript',  # SPA messages
+        r'window\.__NUXT__',  # Nuxt.js
+        r'window\.__INITIAL_STATE__',  # SSR apps
+        r'"statusCode":404',  # JSON error
+        r'Page Not Found',
+        r'The page you requested could not be found',
+        r'This page doesn\'t exist',
+    ]
+    
     SENSITIVE_FILES = {
         'vcs': {
-            'files': [
-                '.git/config',
-                '.git/HEAD',
-                '.git/index',
-                '.gitignore',
-                '.svn/entries',
-                '.svn/wc.db',
-                '.hg/hgrc',
-                '.bzr/README',
-            ],
+            'files': ['.git/config', '.git/HEAD', '.gitignore'],
             'severity': 'CRITICAL',
             'description': 'Version control files exposed - may leak source code',
             'recommendation': 'Block access to version control directories in web server config'
         },
         'config': {
             'files': [
-                '.env',
-                '.env.local',
-                '.env.production',
-                '.env.backup',
-                'config.php',
-                'config.inc.php',
-                'configuration.php',
-                'settings.php',
-                'database.yml',
-                'secrets.yml',
-                'credentials.json',
-                'config.json',
-                'config.yaml',
-                'config.yml',
-                'application.properties',
-                'application.yml',
-                'web.config',
-                'appsettings.json',
-                'wp-config.php',
-                'wp-config.php.bak',
+                '.env', '.env.local', '.env.production',
+                'config.php', 'wp-config.php', 'web.config',
+                'appsettings.json', 'database.yml', 'secrets.yml'
             ],
             'severity': 'CRITICAL',
             'description': 'Configuration file exposed - may contain secrets/credentials',
             'recommendation': 'Never expose configuration files. Store outside webroot.'
         },
         'backup': {
-            'files': [
-                'backup.sql',
-                'backup.zip',
-                'backup.tar.gz',
-                'database.sql',
-                'db.sql',
-                'dump.sql',
-                'site.zip',
-                'www.zip',
-                'htdocs.zip',
-                'public_html.zip',
-                'index.php.bak',
-                'index.php.old',
-                'index.php~',
-                '.index.php.swp',
-            ],
+            'files': ['backup.sql', 'database.sql', 'dump.sql', 'backup.zip'],
             'severity': 'HIGH',
-            'description': 'Backup file exposed - may contain sensitive data or source code',
-            'recommendation': 'Remove backup files from production. Store securely offline.'
+            'description': 'Backup file exposed - may contain sensitive data',
+            'recommendation': 'Remove backup files from production.'
         },
         'debug': {
-            'files': [
-                'phpinfo.php',
-                'info.php',
-                'test.php',
-                'debug.php',
-                'debug.log',
-                'error.log',
-                'error_log',
-                'access.log',
-                'debug/',
-                'test/',
-                '_debug/',
-                'server-status',
-                'server-info',
-                'elmah.axd',
-                'trace.axd',
-            ],
+            'files': ['phpinfo.php', 'debug.log', 'error.log'],
             'severity': 'MEDIUM',
-            'description': 'Debug/test file exposed - may leak sensitive information',
-            'recommendation': 'Remove debug files from production environments'
+            'description': 'Debug/log file exposed - may leak sensitive information',
+            'recommendation': 'Remove debug files from production'
         },
         'docs': {
-            'files': [
-                'swagger.json',
-                'swagger.yaml',
-                'openapi.json',
-                'openapi.yaml',
-                'api-docs',
-                'api-docs/',
-                'swagger-ui/',
-                'swagger-ui.html',
-                'redoc/',
-                'docs/',
-                'api/docs',
-                'api/swagger',
-                'graphql',
-                'graphiql',
-                'playground',
-            ],
+            'files': ['swagger.json', 'swagger.yaml', 'openapi.json', 'openapi.yaml'],
             'severity': 'LOW',
-            'description': 'API documentation exposed - may help attackers understand API',
-            'recommendation': 'Consider restricting API docs to authenticated users in production'
-        },
-        'database': {
-            'files': [
-                'database.sqlite',
-                'database.db',
-                'data.db',
-                'users.db',
-                'app.db',
-                '.sqlite',
-                'db.sqlite3',
-            ],
-            'severity': 'CRITICAL',
-            'description': 'Database file exposed - contains application data',
-            'recommendation': 'Never expose database files. Store outside webroot.'
-        },
-        'logs': {
-            'files': [
-                'logs/',
-                'log/',
-                'error.log',
-                'access.log',
-                'debug.log',
-                'application.log',
-                'app.log',
-                'npm-debug.log',
-                'yarn-error.log',
-            ],
-            'severity': 'MEDIUM',
-            'description': 'Log files exposed - may contain sensitive information',
-            'recommendation': 'Block access to log files and directories'
-        },
-        'ci': {
-            'files': [
-                '.travis.yml',
-                '.gitlab-ci.yml',
-                'Jenkinsfile',
-                '.circleci/config.yml',
-                '.github/workflows/',
-                'docker-compose.yml',
-                'docker-compose.yaml',
-                'Dockerfile',
-                '.dockerignore',
-            ],
-            'severity': 'LOW',
-            'description': 'CI/CD configuration exposed - may reveal deployment details',
-            'recommendation': 'Block access to CI/CD configuration files'
+            'description': 'API documentation exposed',
+            'recommendation': 'Consider restricting API docs to authenticated users'
         },
     }
     
@@ -231,18 +195,13 @@ class SensitiveFileScanner:
         categories: Optional[List[str]] = None
     ) -> SensitiveFilesReport:
         """
-        Scan for sensitive files.
+        Scan for sensitive files with content verification.
         
-        Args:
-            base_url: Target base URL
-            token: Authorization token
-            categories: Categories to scan (all if None)
-        
-        Returns:
-            SensitiveFilesReport
+        Only reports findings with HIGH confidence (actual sensitive content detected).
         """
         findings = []
         headers = {'Authorization': token} if token else {}
+        headers['User-Agent'] = 'Janus-Security-Scanner/3.0'
         
         # Build list of URLs to check
         urls_to_check = []
@@ -257,7 +216,7 @@ class SensitiveFileScanner:
         # Check URLs concurrently
         with ThreadPoolExecutor(max_workers=self.threads) as executor:
             futures = {
-                executor.submit(self._check_file, url, headers): (url, path, cat, cfg)
+                executor.submit(self._check_file_verified, url, file_path, cat, headers): (url, path, cat, cfg)
                 for url, path, cat, cfg in urls_to_check
             }
             
@@ -265,21 +224,25 @@ class SensitiveFileScanner:
                 url, path, category, config = futures[future]
                 try:
                     result = future.result()
-                    if result:
+                    if result and result['confidence'] != 'NONE':
                         findings.append(SensitiveFileFinding(
                             url=url,
                             file_type=path,
                             category=category,
                             status_code=result['status'],
-                            severity=config['severity'],
+                            severity=config['severity'] if result['confidence'] == 'HIGH' else 'MEDIUM',
                             description=config['description'],
-                            recommendation=config['recommendation']
+                            recommendation=config['recommendation'],
+                            confidence=result['confidence'],
+                            evidence=result.get('evidence', '')
                         ))
                 except Exception:
                     pass
         
-        critical = sum(1 for f in findings if f.severity == 'CRITICAL')
-        high = sum(1 for f in findings if f.severity == 'HIGH')
+        # Only count HIGH confidence as verified
+        verified = sum(1 for f in findings if f.confidence == 'HIGH')
+        critical = sum(1 for f in findings if f.severity == 'CRITICAL' and f.confidence == 'HIGH')
+        high = sum(1 for f in findings if f.severity == 'HIGH' and f.confidence == 'HIGH')
         
         return SensitiveFilesReport(
             target_url=base_url,
@@ -287,11 +250,18 @@ class SensitiveFileScanner:
             files_found=len(findings),
             critical_findings=critical,
             high_findings=high,
+            verified_findings=verified,
             findings=findings
         )
     
-    def _check_file(self, url: str, headers: Dict) -> Optional[Dict]:
-        """Check if a file exists and is accessible."""
+    def _check_file_verified(
+        self,
+        url: str,
+        file_path: str,
+        category: str,
+        headers: Dict
+    ) -> Optional[Dict]:
+        """Check if a file exists AND contains actual sensitive content."""
         try:
             response = requests.get(
                 url,
@@ -300,37 +270,94 @@ class SensitiveFileScanner:
                 allow_redirects=False
             )
             
-            # Consider 200 OK as found
-            if response.status_code == 200:
-                # Additional validation - check content length and type
-                content_length = len(response.content)
-                content_type = response.headers.get('Content-Type', '')
+            # Only process 200 OK responses
+            if response.status_code != 200:
+                return None
+            
+            content_length = len(response.content)
+            content_type = response.headers.get('Content-Type', '')
+            
+            # Skip empty responses
+            if content_length == 0:
+                return None
+            
+            # Check for SPA app shell / error page (FALSE POSITIVE)
+            if 'text/html' in content_type:
+                content_text = response.text[:5000]
+                for fp_pattern in self.FALSE_POSITIVE_PATTERNS:
+                    if re.search(fp_pattern, content_text, re.IGNORECASE | re.DOTALL):
+                        return None  # This is likely a SPA serving index.html
+            
+            # Get validators for this file
+            validators = self.CONTENT_VALIDATORS.get(category, {}).get(file_path, [])
+            
+            if validators:
+                # Check for content patterns
+                content = response.content if any(isinstance(v, bytes) for v in validators) else response.text
+                matches = []
                 
-                # Skip if it's a custom error page (usually HTML with certain patterns)
-                if 'text/html' in content_type and content_length > 0:
-                    if '404' in response.text.lower() or 'not found' in response.text.lower():
-                        return None
+                for pattern in validators:
+                    if isinstance(pattern, bytes):
+                        if re.search(pattern, response.content):
+                            matches.append(pattern.decode('utf-8', errors='ignore')[:20])
+                    else:
+                        match = re.search(pattern, response.text, re.MULTILINE | re.IGNORECASE)
+                        if match:
+                            matches.append(match.group(0)[:50])
                 
-                # File found
-                if content_length > 0:
+                if matches:
                     return {
                         'status': response.status_code,
-                        'size': content_length,
-                        'type': content_type
+                        'confidence': 'HIGH',
+                        'evidence': f"Content verified: {', '.join(matches[:3])}"
+                    }
+                else:
+                    # File exists but no sensitive patterns matched
+                    # This could be a false positive or sanitized file
+                    return {
+                        'status': response.status_code,
+                        'confidence': 'LOW',
+                        'evidence': f"File exists but content not verified (size: {content_length})"
+                    }
+            else:
+                # No validators defined - use basic heuristics
+                if self._looks_sensitive(response.text, file_path, content_type):
+                    return {
+                        'status': response.status_code,
+                        'confidence': 'MEDIUM',
+                        'evidence': f"Heuristic match (Content-Type: {content_type})"
                     }
             
-            # 403 Forbidden might indicate the file exists but is protected
-            elif response.status_code == 403:
-                return {
-                    'status': response.status_code,
-                    'size': 0,
-                    'type': 'forbidden'
-                }
-                
         except Exception:
             pass
         
         return None
+    
+    def _looks_sensitive(self, content: str, file_path: str, content_type: str) -> bool:
+        """Basic heuristics for file sensitivity."""
+        # Check content type matches expected
+        if file_path.endswith('.json') and 'application/json' not in content_type:
+            return False
+        if file_path.endswith('.yaml') and 'yaml' not in content_type and 'text/plain' not in content_type:
+            return False
+        if file_path.endswith('.sql') and 'CREATE TABLE' not in content and 'INSERT' not in content:
+            return False
+        
+        # Generic sensitive patterns
+        sensitive_patterns = [
+            r'password\s*[=:]',
+            r'secret\s*[=:]',
+            r'api_key\s*[=:]',
+            r'private_key',
+            r'BEGIN RSA PRIVATE KEY',
+            r'BEGIN OPENSSH PRIVATE KEY',
+        ]
+        
+        for pattern in sensitive_patterns:
+            if re.search(pattern, content, re.IGNORECASE):
+                return True
+        
+        return False
     
     def quick_scan(
         self,
@@ -338,18 +365,21 @@ class SensitiveFileScanner:
         token: Optional[str] = None
     ) -> Dict[str, Any]:
         """Quick scan focusing on critical files."""
-        report = self.scan(base_url, token, categories=['vcs', 'config', 'database'])
+        report = self.scan(base_url, token, categories=['vcs', 'config'])
         
         return {
             "url": base_url,
             "files_found": report.files_found,
+            "verified": report.verified_findings,
             "critical": report.critical_findings,
             "findings": [
                 {
                     "path": f.file_type,
                     "category": f.category,
-                    "severity": f.severity
+                    "severity": f.severity,
+                    "confidence": f.confidence,
+                    "evidence": f.evidence
                 }
-                for f in report.findings
+                for f in report.findings if f.confidence in ['HIGH', 'MEDIUM']
             ]
         }

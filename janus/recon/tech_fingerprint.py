@@ -97,12 +97,12 @@ class TechFingerprinter:
     
     # HTML/content-based detection
     CONTENT_SIGNATURES = [
-        # CMS
-        {'pattern': r'wp-content|wp-includes', 'name': 'WordPress', 'category': 'cms', 'confidence': 'high'},
-        {'pattern': r'/sites/default/files|drupal', 'name': 'Drupal', 'category': 'cms', 'confidence': 'high'},
-        {'pattern': r'joomla', 'name': 'Joomla', 'category': 'cms', 'confidence': 'medium'},
-        {'pattern': r'magento|mage/', 'name': 'Magento', 'category': 'cms', 'confidence': 'high'},
-        {'pattern': r'shopify', 'name': 'Shopify', 'category': 'cms', 'confidence': 'high'},
+        # CMS - Use stricter patterns to avoid false positives
+        {'pattern': r'wp-content/|wp-includes/', 'name': 'WordPress', 'category': 'cms', 'confidence': 'high'},
+        {'pattern': r'/sites/default/files|Drupal\.settings', 'name': 'Drupal', 'category': 'cms', 'confidence': 'high'},
+        {'pattern': r'/media/jui/|com_content', 'name': 'Joomla', 'category': 'cms', 'confidence': 'high'},
+        {'pattern': r'/skin/frontend/|/static/version\d+/frontend|Mage\.Cookies|X-Magento-', 'name': 'Magento', 'category': 'cms', 'confidence': 'high'},
+        {'pattern': r'cdn\.shopify\.com|Shopify\.theme', 'name': 'Shopify', 'category': 'cms', 'confidence': 'high'},
         
         # Frameworks
         {'pattern': r'__next|_next/static', 'name': 'Next.js', 'category': 'framework', 'confidence': 'high'},
