@@ -1702,7 +1702,9 @@ async def get_report_html():
             '''
             for r in report.results:
                 if r.vulnerable and r.findings_count > 0:
-                    html += f'<div style="margin:5px 0;color:{{"CRITICAL":"#f43f5e","HIGH":"#fb923c","MEDIUM":"#fbbf24"}.get(r.severity, "#8b949e")};">▸ {r.module}: {r.findings_count} findings</div>'
+                    severity_colors = {"CRITICAL": "#f43f5e", "HIGH": "#fb923c", "MEDIUM": "#fbbf24", "LOW": "#38bdf8"}
+                    color = severity_colors.get(r.severity, "#8b949e")
+                    html += f'<div style="margin:5px 0;color:{color};">▸ {r.module}: {r.findings_count} findings</div>'
         html += '</div>'
     
     html += '''
