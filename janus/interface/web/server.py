@@ -1400,6 +1400,165 @@ async def export_sarif():
     }
 
 
+# ================== NEW SECURITY SCANNER ENDPOINTS ==================
+
+@app.post("/api/sqli")
+async def test_sqli(url: str = Form(...), param: str = Form(...), token: str = Form("")):
+    """Test for SQL injection vulnerabilities."""
+    try:
+        from janus.attack.sqli_detector import SQLiDetector
+        detector = SQLiDetector()
+        report = detector.scan(url, [param], token if token else None)
+        return {
+            "vulnerable": report.vulnerable_params > 0,
+            "params_tested": report.total_params_tested,
+            "findings": [f.to_dict() for f in report.findings]
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.post("/api/xss")
+async def test_xss(url: str = Form(...), param: str = Form(...), token: str = Form("")):
+    """Test for XSS vulnerabilities."""
+    try:
+        from janus.attack.xss_scanner import XSSScanner
+        scanner = XSSScanner()
+        report = scanner.scan(url, [param], token if token else None)
+        return {
+            "vulnerable": report.vulnerable_params > 0,
+            "params_tested": report.total_params_tested,
+            "findings": [f.to_dict() for f in report.findings]
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.post("/api/headers")
+async def test_security_headers(url: str = Form(...), token: str = Form("")):
+    """Scan for security headers."""
+    try:
+        from janus.analysis.security_headers import SecurityHeadersScanner
+        scanner = SecurityHeadersScanner()
+        report = scanner.scan(url, token if token else None)
+        return {
+            "grade": report.overall_grade,
+            "secure": report.secure_headers,
+            "missing": report.missing_headers,
+            "misconfigured": report.misconfigured_headers,
+            "findings": [f.to_dict() for f in report.findings]
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.post("/api/cors")
+async def test_cors(url: str = Form(...), token: str = Form("")):
+    """Test for CORS misconfigurations."""
+    try:
+        from janus.analysis.cors_scanner import CORSScanner
+        scanner = CORSScanner()
+        report = scanner.scan(url, token if token else None)
+        return {
+            "vulnerable": report.vulnerable,
+            "critical": report.critical_findings,
+            "high": report.high_findings,
+            "findings": [f.to_dict() for f in report.findings]
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.post("/api/files")
+async def scan_sensitive_files(url: str = Form(...), quick: bool = Form(False), token: str = Form("")):
+    """Scan for exposed sensitive files."""
+    try:
+        from janus.recon.sensitive_files import SensitiveFileScanner
+        scanner = SensitiveFileScanner()
+        if quick:
+            result = scanner.quick_scan(url, token if token else None)
+            return result
+        else:
+            report = scanner.scan(url, token if token else None)
+            return {
+                "files_found": report.files_found,
+                "critical": report.critical_findings,
+                "high": report.high_findings,
+                "findings": [f.to_dict() for f in report.findings]
+            }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.post("/api/fingerprint")
+async def fingerprint_tech(url: str = Form(...), token: str = Form("")):
+    """Fingerprint technologies."""
+    try:
+        from janus.recon.tech_fingerprint import TechFingerprinter
+        fingerprinter = TechFingerprinter()
+        result = fingerprinter.quick_fingerprint(url, token if token else None)
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.post("/api/lfi")
+async def test_lfi(url: str = Form(...), param: str = Form(...), os: str = Form("unix"), token: str = Form("")):
+    """Test for path traversal / LFI."""
+    try:
+        from janus.attack.path_traversal import PathTraversalScanner
+        scanner = PathTraversalScanner()
+        report = scanner.scan(url, [param], token if token else None, os)
+        return {
+            "vulnerable": report.vulnerable_params > 0,
+            "params_tested": report.total_params_tested,
+            "findings": [f.to_dict() for f in report.findings]
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.post("/api/redirect")
+async def test_redirect(url: str = Form(...), token: str = Form("")):
+    """Test for open redirect."""
+    try:
+        from janus.attack.open_redirect import OpenRedirectScanner
+        scanner = OpenRedirectScanner()
+        result = scanner.quick_scan(url, token if token else None)
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.post("/api/ratelimit")
+async def test_ratelimit(url: str = Form(...), requests: int = Form(30), token: str = Form("")):
+    """Test rate limiting."""
+    try:
+        from janus.attack.rate_limit_tester import RateLimitTester
+        tester = RateLimitTester()
+        result = tester.test_endpoint(url, "GET", token if token else None, num_requests=min(requests, 100))
+        return {
+            "rate_limit_detected": result.rate_limit_detected,
+            "requests_sent": result.requests_sent,
+            "successful": result.successful_requests,
+            "blocked": result.blocked_requests,
+            "threshold": result.limit_threshold,
+            "severity": result.severity,
+            "recommendation": result.recommendation
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/v2")
+async def dashboard_v2():
+    """Render the new modern dashboard."""
+    from janus.interface.web.dashboard_v2 import get_modern_dashboard_html
+    db = JanusDatabase()
+    tokens = db.get_all_tokens()
+    return HTMLResponse(get_modern_dashboard_html(tokens))
+
+
 def run_server(host: str = "0.0.0.0", port: int = 8000):
     """Run the web server."""
     import uvicorn

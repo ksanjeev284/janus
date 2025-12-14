@@ -955,11 +955,371 @@ def ssrf(
                   f"Critical: {report['critical_count']} | High: {report['high_count']}[/dim]")
 
 
+@app.command("security-headers")
+def security_headers(
+    url: str = typer.Option(..., "--url", "-u", help="Target URL to scan"),
+    token: str = typer.Option(None, "--token", "-t", help="Authorization token"),
+):
+    """
+    🛡️ Scan for security headers (HSTS, CSP, X-Frame-Options, etc.)
+    
+    Checks for missing or misconfigured security headers and provides a grade.
+    """
+    print_banner()
+    
+    from janus.analysis.security_headers import SecurityHeadersScanner
+    
+    console.print(f"[cyan]Scanning security headers for {url}[/cyan]\n")
+    
+    scanner = SecurityHeadersScanner()
+    report = scanner.scan(url, token)
+    
+    # Display grade
+    grade_colors = {'A': 'green', 'B': 'green', 'C': 'yellow', 'D': 'red', 'F': 'red'}
+    grade_color = grade_colors.get(report.overall_grade, 'white')
+    
+    console.print(Panel(
+        f"[bold {grade_color}]Grade: {report.overall_grade}[/bold {grade_color}]",
+        title="Security Headers Score"
+    ))
+    
+    # Display findings table
+    table = Table(title="Header Analysis")
+    table.add_column("Header", style="cyan")
+    table.add_column("Status")
+    table.add_column("Severity")
+    table.add_column("Value/Issue")
+    
+    for f in report.findings:
+        status_color = {'SECURE': 'green', 'MISSING': 'red', 'MISCONFIGURED': 'yellow', 'WARNING': 'yellow'}.get(f.status, 'dim')
+        sev_color = {'CRITICAL': 'red', 'HIGH': 'red', 'MEDIUM': 'yellow', 'LOW': 'blue'}.get(f.severity, 'dim')
+        
+        value = f.current_value[:40] + "..." if f.current_value and len(f.current_value) > 40 else (f.current_value or "Not set")
+        
+        table.add_row(
+            f.header_name,
+            f"[{status_color}]{f.status}[/{status_color}]",
+            f"[{sev_color}]{f.severity}[/{sev_color}]",
+            value
+        )
+    
+    console.print(table)
+    
+    console.print(f"\n[dim]Secure: {report.secure_headers} | Missing: {report.missing_headers} | Misconfigured: {report.misconfigured_headers}[/dim]")
+
+
+@app.command()
+def cors(
+    url: str = typer.Option(..., "--url", "-u", help="Target URL to scan"),
+    token: str = typer.Option(None, "--token", "-t", help="Authorization token"),
+):
+    """
+    🔀 Scan for CORS misconfigurations.
+    
+    Tests for origin reflection, wildcard, null origin, and other CORS issues.
+    """
+    print_banner()
+    
+    from janus.analysis.cors_scanner import CORSScanner
+    
+    console.print(f"[cyan]Scanning CORS configuration for {url}[/cyan]\n")
+    
+    scanner = CORSScanner()
+    report = scanner.scan(url, token)
+    
+    if report.vulnerable:
+        console.print(f"[bold red]🚨 CORS misconfigurations found![/bold red]\n")
+        
+        table = Table(title="CORS Findings")
+        table.add_column("Vulnerability", style="cyan")
+        table.add_column("Severity")
+        table.add_column("Origin Tested")
+        table.add_column("Evidence")
+        
+        for f in report.findings:
+            sev_color = {'CRITICAL': 'red', 'HIGH': 'yellow', 'MEDIUM': 'blue'}.get(f.severity, 'dim')
+            table.add_row(
+                f.vulnerability,
+                f"[{sev_color}]{f.severity}[/{sev_color}]",
+                f.origin_tested,
+                f.evidence[:50] + "..."
+            )
+        
+        console.print(table)
+    else:
+        console.print("[green]✓ No CORS misconfigurations detected[/green]")
+    
+    console.print(f"\n[dim]Critical: {report.critical_findings} | High: {report.high_findings}[/dim]")
+
+
+@app.command("open-redirect")
+def open_redirect(
+    url: str = typer.Option(..., "--url", "-u", help="Target URL"),
+    param: str = typer.Option(None, "--param", "-p", help="Specific parameter to test"),
+    token: str = typer.Option(None, "--token", "-t", help="Authorization token"),
+):
+    """
+    🔄 Scan for open redirect vulnerabilities.
+    
+    Tests common redirect parameters for unvalidated redirects.
+    """
+    print_banner()
+    
+    from janus.attack.open_redirect import OpenRedirectScanner
+    
+    console.print(f"[cyan]Scanning for open redirects on {url}[/cyan]\n")
+    
+    scanner = OpenRedirectScanner()
+    
+    if param:
+        findings = scanner.scan_endpoint(url, param, token)
+        vulnerable_count = len(findings)
+    else:
+        result = scanner.quick_scan(url, token)
+        findings = result.get('findings', [])
+        vulnerable_count = result.get('vulnerable_params', 0)
+    
+    if vulnerable_count > 0:
+        console.print(f"[bold red]🚨 {vulnerable_count} open redirect vulnerabilities found![/bold red]\n")
+        
+        for f in findings:
+            if isinstance(f, dict):
+                console.print(f"  • [cyan]{f.get('param')}[/cyan]: {f.get('payload')}")
+            else:
+                console.print(f"  • [cyan]{f.parameter}[/cyan]: {f.payload}")
+    else:
+        console.print("[green]✓ No open redirect vulnerabilities detected[/green]")
+
+
+@app.command()
+def sqli(
+    url: str = typer.Option(..., "--url", "-u", help="Target URL"),
+    param: str = typer.Option(..., "--param", "-p", help="Parameter to test"),
+    token: str = typer.Option(None, "--token", "-t", help="Authorization token"),
+):
+    """
+    💉 Scan for SQL injection vulnerabilities.
+    
+    Uses error-based and time-based detection techniques.
+    """
+    print_banner()
+    
+    from janus.attack.sqli_detector import SQLiDetector
+    
+    console.print(f"[cyan]Testing for SQL injection on {url}[/cyan]")
+    console.print(f"[dim]Parameter: {param}[/dim]\n")
+    
+    detector = SQLiDetector()
+    report = detector.scan(url, [param], token)
+    
+    if report.vulnerable_params > 0:
+        console.print(f"[bold red]🚨 SQL INJECTION DETECTED![/bold red]\n")
+        
+        for f in report.findings:
+            if f.vulnerable:
+                console.print(f"[red]Technique: {f.technique}[/red]")
+                console.print(f"[yellow]Payload: {f.payload}[/yellow]")
+                console.print(f"Evidence: {f.evidence}")
+                console.print(f"\n[dim]Recommendation: {f.recommendation}[/dim]")
+    else:
+        console.print("[green]✓ No SQL injection detected[/green]")
+    
+    console.print(f"\n[dim]⚠️ This is basic detection only. Manual testing recommended.[/dim]")
+
+
+@app.command("rate-limit")
+def rate_limit(
+    url: str = typer.Option(..., "--url", "-u", help="Target endpoint"),
+    method: str = typer.Option("GET", "--method", "-m", help="HTTP method"),
+    token: str = typer.Option(None, "--token", "-t", help="Authorization token"),
+    requests: int = typer.Option(30, "--requests", "-n", help="Number of requests to send"),
+):
+    """
+    ⏱️ Test API rate limiting.
+    
+    Sends rapid requests to check if rate limiting is implemented.
+    """
+    print_banner()
+    
+    from janus.attack.rate_limit_tester import RateLimitTester
+    
+    console.print(f"[cyan]Testing rate limiting on {url}[/cyan]")
+    console.print(f"[dim]Sending {requests} {method} requests...[/dim]\n")
+    
+    tester = RateLimitTester()
+    result = tester.test_endpoint(url, method, token, num_requests=requests)
+    
+    if result.rate_limit_detected:
+        console.print(f"[green]✓ Rate limiting detected[/green]")
+        if result.limit_threshold:
+            console.print(f"[dim]Limit threshold: ~{result.limit_threshold} requests[/dim]")
+    else:
+        console.print(f"[bold red]🚨 No rate limiting detected![/bold red]")
+    
+    console.print(f"\n[dim]Sent: {result.requests_sent} | Successful: {result.successful_requests} | Blocked (429): {result.blocked_requests}[/dim]")
+    
+    if result.recommendation:
+        console.print(f"\n[yellow]Recommendation:[/yellow] {result.recommendation}")
+
+
+@app.command()
+def xss(
+    url: str = typer.Option(..., "--url", "-u", help="Target URL"),
+    param: str = typer.Option(..., "--param", "-p", help="Parameter to test"),
+    token: str = typer.Option(None, "--token", "-t", help="Authorization token"),
+):
+    """
+    💥 Scan for XSS (Cross-Site Scripting) vulnerabilities.
+    
+    Tests parameters for reflected XSS with context-aware payloads.
+    """
+    print_banner()
+    
+    from janus.attack.xss_scanner import XSSScanner
+    
+    console.print(f"[cyan]Testing for XSS on {url}[/cyan]")
+    console.print(f"[dim]Parameter: {param}[/dim]\n")
+    
+    scanner = XSSScanner()
+    report = scanner.scan(url, [param], token)
+    
+    if report.vulnerable_params > 0:
+        console.print(f"[bold red]🚨 XSS VULNERABILITY DETECTED![/bold red]\n")
+        
+        for f in report.findings:
+            if f.vulnerable:
+                console.print(f"[red]Context: {f.context}[/red]")
+                console.print(f"[yellow]Payload: {f.payload[:60]}...[/yellow]")
+                console.print(f"Evidence: {f.evidence[:100]}")
+                console.print(f"\n[dim]Recommendation: {f.recommendation}[/dim]")
+    else:
+        console.print("[green]✓ No XSS vulnerabilities detected[/green]")
+
+
+@app.command()
+def lfi(
+    url: str = typer.Option(..., "--url", "-u", help="Target URL"),
+    param: str = typer.Option(..., "--param", "-p", help="Parameter to test"),
+    token: str = typer.Option(None, "--token", "-t", help="Authorization token"),
+    os_type: str = typer.Option("unix", "--os", help="Target OS: unix or windows"),
+):
+    """
+    📂 Scan for LFI/Path Traversal vulnerabilities.
+    
+    Tests for directory traversal to read sensitive files.
+    """
+    print_banner()
+    
+    from janus.attack.path_traversal import PathTraversalScanner
+    
+    console.print(f"[cyan]Testing for Path Traversal on {url}[/cyan]")
+    console.print(f"[dim]Parameter: {param} | OS: {os_type}[/dim]\n")
+    
+    scanner = PathTraversalScanner()
+    report = scanner.scan(url, [param], token, os_type)
+    
+    if report.vulnerable_params > 0:
+        console.print(f"[bold red]🚨 PATH TRAVERSAL DETECTED![/bold red]\n")
+        
+        for f in report.findings:
+            if f.vulnerable:
+                console.print(f"[red]File accessed: {f.file_accessed}[/red]")
+                console.print(f"[yellow]Payload: {f.payload}[/yellow]")
+                console.print(f"Evidence: {f.evidence}")
+                console.print(f"\n[dim]Recommendation: {f.recommendation}[/dim]")
+    else:
+        console.print("[green]✓ No path traversal vulnerabilities detected[/green]")
+
+
+@app.command("sensitive-files")
+def sensitive_files(
+    url: str = typer.Option(..., "--url", "-u", help="Target base URL"),
+    token: str = typer.Option(None, "--token", "-t", help="Authorization token"),
+    quick: bool = typer.Option(False, "--quick", "-q", help="Quick scan (critical files only)"),
+):
+    """
+    🔍 Scan for exposed sensitive files (.git, .env, backups, etc.)
+    
+    Checks for version control, config files, backups, and debug endpoints.
+    """
+    print_banner()
+    
+    from janus.recon.sensitive_files import SensitiveFileScanner
+    
+    console.print(f"[cyan]Scanning for sensitive files on {url}[/cyan]\n")
+    
+    scanner = SensitiveFileScanner()
+    
+    if quick:
+        result = scanner.quick_scan(url, token)
+        if result['files_found'] > 0:
+            console.print(f"[bold red]🚨 {result['files_found']} sensitive files found![/bold red]\n")
+            for f in result['findings']:
+                sev_color = {'CRITICAL': 'red', 'HIGH': 'yellow', 'MEDIUM': 'blue'}.get(f['severity'], 'dim')
+                console.print(f"  [{sev_color}]{f['severity']}[/{sev_color}] {f['path']} ({f['category']})")
+        else:
+            console.print("[green]✓ No sensitive files found[/green]")
+    else:
+        report = scanner.scan(url, token)
+        
+        if report.files_found > 0:
+            console.print(f"[bold red]🚨 {report.files_found} sensitive files found![/bold red]\n")
+            
+            table = Table(title="Sensitive Files")
+            table.add_column("File", style="cyan")
+            table.add_column("Category")
+            table.add_column("Severity")
+            table.add_column("Status")
+            
+            for f in report.findings:
+                sev_color = {'CRITICAL': 'red', 'HIGH': 'yellow', 'MEDIUM': 'blue', 'LOW': 'dim'}.get(f.severity, 'dim')
+                table.add_row(
+                    f.file_type,
+                    f.category,
+                    f"[{sev_color}]{f.severity}[/{sev_color}]",
+                    str(f.status_code)
+                )
+            
+            console.print(table)
+            console.print(f"\n[dim]Critical: {report.critical_findings} | High: {report.high_findings}[/dim]")
+        else:
+            console.print("[green]✓ No sensitive files found[/green]")
+
+
+@app.command()
+def fingerprint(
+    url: str = typer.Option(..., "--url", "-u", help="Target URL"),
+    token: str = typer.Option(None, "--token", "-t", help="Authorization token"),
+):
+    """
+    🔬 Fingerprint technologies (servers, frameworks, CMS, CDN).
+    
+    Identifies web technologies used by the target.
+    """
+    print_banner()
+    
+    from janus.recon.tech_fingerprint import TechFingerprinter
+    
+    console.print(f"[cyan]Fingerprinting technologies on {url}[/cyan]\n")
+    
+    fingerprinter = TechFingerprinter()
+    result = fingerprinter.quick_fingerprint(url, token)
+    
+    if result['technologies_found'] > 0:
+        console.print(f"[bold green]Detected {result['technologies_found']} technologies:[/bold green]\n")
+        
+        for category, techs in result['by_category'].items():
+            console.print(f"[cyan]{category.upper()}:[/cyan]")
+            for tech in techs:
+                console.print(f"  • {tech}")
+            console.print()
+    else:
+        console.print("[dim]No technologies detected[/dim]")
+
+
 def main():
     app()
 
 
 if __name__ == "__main__":
     main()
-
-

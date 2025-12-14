@@ -6,24 +6,41 @@
 [![Docker Deploy](https://github.com/ksanjeev284/janus/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/ksanjeev284/janus/actions/workflows/docker-publish.yml)
 [![PyPI version](https://badge.fury.io/py/janus-security.svg)](https://badge.fury.io/py/janus-security)
 
-**Janus** is an enterprise-grade API security scanner designed for Red Teams and advanced security testing. Unlike traditional scanners, Janus uses a distinct approach for detecting **BOLA (Broken Object Level Authorization)**, **BFLA**, and **Race Conditions** without relying on external AI APIs.
+**Janus** is an enterprise-grade API security scanner designed for Red Teams and advanced security testing. Features 15+ security testing modules for comprehensive vulnerability assessment.
 
 ![Janus Dashboard](docs/dashboard-preview.png)
 
 ## Features 🚀
 
--   **BOLA/IDOR Detection**: Automatic analysis of resource access patterns.
--   **Broken Function Level Authorization (BFLA)**: Vertical privilege escalation testing.
--   **PII & Secrets Scanning**: Detect sensitive data leaks in API responses.
--   **Race Condition Testing**: Multi-threaded exploitation of concurrency bugs.
--   **SSRF Testing**: Server-Side Request Forgery with 25+ payloads (internal networks, cloud metadata, file protocols).
--   **Stealth Mode**: WAF evasion with header rotation, jitter, and proxies.
--   **Proxy Support**: HTTP, HTTPS, and SOCKS5 proxies (including Tor).
--   **Custom Headers**: Add custom headers to all requests.
--   **Team Collaboration**: Real-time finding synchronization via Redis/Hive-Mind.
--   **CI/CD Integration**: Export findings to SARIF for GitHub Security tab.
--   **Web Dashboard**: Modern UI for managing scans and viewing reports.
--   **Webhook Notifications**: Send alerts to Discord, Slack, or custom endpoints.
+### Authorization Testing
+- **BOLA/IDOR Detection** - Automatic analysis of resource access patterns
+- **BFLA Scanner** - Vertical privilege escalation testing
+- **JWT Attacks** - Token manipulation and weak secret detection
+
+### Injection Testing
+- **SQL Injection** - Error-based and time-based detection (MySQL, PostgreSQL, MSSQL, Oracle, SQLite)
+- **XSS Scanner** - Context-aware cross-site scripting detection with 30+ payloads
+- **SSRF Testing** - Server-side request forgery with 25+ payloads (internal networks, cloud metadata)
+- **Path Traversal/LFI** - Directory traversal with encoding bypasses
+
+### Configuration Analysis
+- **Security Headers** - HSTS, CSP, X-Frame-Options analysis with A-F grading
+- **CORS Scanner** - Origin reflection, wildcard, null origin detection
+- **Open Redirect** - Unvalidated redirect testing with 30+ bypass payloads
+- **Rate Limiting** - API rate limit and brute force protection testing
+
+### Reconnaissance
+- **Sensitive Files** - Find exposed .git, .env, backups, logs (80+ paths)
+- **Tech Fingerprint** - Detect servers, frameworks, CMS, CDN
+- **PII Scanner** - Detect sensitive data leaks in API responses
+- **CVE Lookup** - Check for known vulnerabilities
+
+### Advanced Features
+- **Proxy Support** - HTTP, HTTPS, SOCKS5 (including Tor)
+- **Custom Headers** - Add custom headers to all requests
+- **Stealth Mode** - WAF evasion with header rotation and jitter
+- **Webhook Notifications** - Discord, Slack, Email alerts
+- **CI/CD Integration** - SARIF export for GitHub Security tab
 
 ## Installation 📦
 
@@ -41,52 +58,79 @@ pip install .
 
 ## Quick Start 🏃‍♂️
 
-### 1. Web Dashboard (Recommended)
-
-**Option A: Using Docker (Fastest)**
+### Web Dashboard
 ```bash
-# Pull and run the latest image
-docker run -p 8000:8000 ghcr.io/ksanjeev284/janus:latest
-```
-
-**Option B: From Source**
-Start the web server and dashboard:
-```bash
+# Start dashboard
 python -m janus.interface.web.server
 # Access at http://localhost:8000
 ```
 
-### 2. CLI Usage
-Janus provides a powerful CLI for automation testing.
+### CLI Commands
 
-**Basic BOLA Scan:**
+#### Authorization Testing
 ```bash
+# BOLA/IDOR Scan
 janus scan --victim <token> --attacker <token> --host <url>
-```
 
-**SSRF Testing:**
-```bash
-janus ssrf --endpoint https://api.example.com/fetch --param url --quick
-```
-
-**Stealth Test:**
-```bash
-janus stealth-test
-```
-
-**Vertical Escalation (BFLA):**
-```bash
+# BFLA (Privilege Escalation)
 janus bfla --host https://api.example.com --low <user_token>
+
+# JWT Analysis
+janus jwt --token <jwt_token>
 ```
 
-### 3. Proxy & Custom Headers
+#### Injection Testing
+```bash
+# SQL Injection
+janus sqli --url "https://api.example.com/search?q=test" --param q
 
-Using the HTTP client programmatically:
+# XSS Detection
+janus xss --url "https://example.com/page?name=test" --param name
+
+# SSRF Testing
+janus ssrf --endpoint https://api.example.com/fetch --param url
+
+# Path Traversal / LFI
+janus lfi --url "https://example.com/view?file=test" --param file
+```
+
+#### Configuration Analysis
+```bash
+# Security Headers (A-F Grade)
+janus security-headers --url https://example.com
+
+# CORS Misconfiguration
+janus cors --url https://api.example.com
+
+# Open Redirect
+janus open-redirect --url https://example.com/login?next=
+
+# Rate Limiting
+janus rate-limit --url https://api.example.com/login --requests 50
+```
+
+#### Reconnaissance
+```bash
+# Sensitive Files (.git, .env, backups)
+janus sensitive-files --url https://example.com
+
+# Technology Fingerprint
+janus fingerprint --url https://example.com
+
+# PII Scanner
+janus pii --url https://api.example.com/user/1 --token <token>
+
+# Race Condition
+janus race --url https://api.example.com/withdraw --token <token>
+```
+
+## Proxy & Custom Headers
+
 ```python
 from janus.core.http_client import JanusHTTPClient
 
 client = JanusHTTPClient()
-client.set_proxy("http://proxy.example.com:8080")  # HTTP proxy
+client.set_proxy("http://proxy.example.com:8080")  # HTTP
 client.set_proxy("socks5://127.0.0.1:9050", "socks5")  # Tor
 client.add_global_header("X-API-Key", "your-key")
 client.set_ssl_verify(False)  # For testing
@@ -94,15 +138,21 @@ client.set_ssl_verify(False)  # For testing
 status, body, raw = client.get("https://api.example.com", token="Bearer xyz")
 ```
 
+## CI/CD Integration
+
+```bash
+# Generate SARIF report (exits with code 1 if vulnerabilities found)
+janus ci-scan --victim <token> --attacker <token> --host <url>
+```
+
 ## Architecture 🏗️
 
-Janus operates by "learning" from legitimate traffic (via its proxy or provided tokens) to understand the structure of API resources. It then attempts to access those same resources using a different user's context (the attacker), analyzing the structural similarity of the responses to determine vulnerability.
+Janus operates by "learning" from legitimate traffic to understand API resource structures, then attempts access using a different user's context, analyzing response similarity to determine vulnerability.
 
 ## Contributing 🤝
 
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 ## License 📄
 
 MIT License - see [LICENSE](LICENSE) for details.
-
