@@ -281,26 +281,36 @@ def get_modern_dashboard_html(tokens: list) -> str:
                 
                 <!-- BOLA Panel -->
                 <div id="panel-bola" class="bg-dark-800 rounded-2xl p-6 border border-dark-600 card-glow hidden">
+                    <div class="mb-4 p-3 bg-gradient-to-r from-red-500/20 to-orange-500/20 rounded-xl border border-red-500/30">
+                        <h3 class="font-bold text-red-400 flex items-center gap-2">🔓 BOLA/IDOR Scanner</h3>
+                        <p class="text-xs text-gray-400 mt-1">Test for Broken Object Level Authorization vulnerabilities</p>
+                    </div>
                     <form id="bolaForm" class="space-y-4">
                         <div>
                             <label class="block text-sm text-gray-400 mb-2">Target API URL</label>
-                            <input type="text" name="host" value="http://localhost:5000" 
+                            <input type="text" name="host" placeholder="http://localhost:5000 or https://api.example.com" 
                                    class="w-full px-4 py-3 bg-dark-900 border border-dark-600 rounded-xl mono text-sm focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all">
                         </div>
                         <div>
-                            <label class="block text-sm text-gray-400 mb-2">Victim Token</label>
-                            <select name="victim_token" class="w-full px-4 py-3 bg-dark-900 border border-dark-600 rounded-xl mono text-sm">
-                                {token_options}
-                            </select>
+                            <label class="block text-sm text-gray-400 mb-2">Victim Token (User A)</label>
+                            <input type="text" name="victim_token" placeholder="Bearer eyJ... or paste any auth token"
+                                   class="w-full px-4 py-3 bg-dark-900 border border-dark-600 rounded-xl mono text-sm focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all">
+                            <p class="text-[10px] text-gray-500 mt-1">Token of the user whose data you're trying to protect</p>
                         </div>
                         <div>
-                            <label class="block text-sm text-gray-400 mb-2">Attacker Token</label>
-                            <select name="attacker_token" class="w-full px-4 py-3 bg-dark-900 border border-dark-600 rounded-xl mono text-sm">
-                                {token_options}
-                            </select>
+                            <label class="block text-sm text-gray-400 mb-2">Attacker Token (User B)</label>
+                            <input type="text" name="attacker_token" placeholder="Bearer eyJ... or paste any auth token"
+                                   class="w-full px-4 py-3 bg-dark-900 border border-dark-600 rounded-xl mono text-sm focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all">
+                            <p class="text-[10px] text-gray-500 mt-1">Token of a different user trying to access User A's data</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-2">Resource ID (optional)</label>
+                            <input type="text" name="resource_id" placeholder="1, 2, user_123..."
+                                   class="w-full px-4 py-3 bg-dark-900 border border-dark-600 rounded-xl mono text-sm">
+                            <p class="text-[10px] text-gray-500 mt-1">ID of the resource to test access to</p>
                         </div>
                         <button type="submit" class="btn-primary w-full py-3 gradient-accent rounded-xl font-semibold text-white">
-                            🚀 Launch Scan
+                            🔓 Test BOLA/IDOR
                         </button>
                     </form>
                 </div>
