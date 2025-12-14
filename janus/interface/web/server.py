@@ -1772,6 +1772,7 @@ async def run_autoscan(
     """Run comprehensive auto-scan with all selected modules."""
     try:
         from janus.core.auto_scanner import AutoScanner
+        from janus.reporting.report_manager import get_report_manager
         
         scanner = AutoScanner(timeout=30)
         report = scanner.scan(
@@ -1781,10 +1782,98 @@ async def run_autoscan(
             modules=modules if modules else None
         )
         
-        # Store for export
+        # Store in memory for quick access
         autoscan_reports[report.scan_id] = report
         
+        # Save to persistent report manager
+        manager = get_report_manager()
+        manager.save_report(report.to_dict(), scan_type="autoscan")
+        
         return report.to_dict()
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# ================== REPORT MANAGEMENT API ==================
+
+@app.get("/api/reports")
+async def list_reports(limit: int = 20, target: str = "", scan_type: str = ""):
+    """List all stored reports."""
+    try:
+        from janus.reporting.report_manager import get_report_manager
+        manager = get_report_manager()
+        
+        reports = manager.list_reports(
+            limit=limit,
+            target_url=target if target else None,
+            scan_type=scan_type if scan_type else None
+        )
+        
+        return {
+            "reports": [r.to_dict() for r in reports],
+            "stats": manager.get_stats()
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/api/reports/{report_id}")
+async def get_report(report_id: str):
+    """Get a specific report by ID."""
+    try:
+        from janus.reporting.report_manager import get_report_manager
+        manager = get_report_manager()
+        
+        report = manager.get_report(report_id)
+        if report:
+            return {"report": report, "metadata": manager.get_metadata(report_id).to_dict()}
+        else:
+            return {"error": f"Report {report_id} not found"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/api/reports/{report_id}/export")
+async def export_report(report_id: str, format: str = "json"):
+    """Export a report to various formats."""
+    try:
+        from janus.reporting.report_manager import get_report_manager
+        import tempfile
+        
+        manager = get_report_manager()
+        
+        output_path = os.path.join(tempfile.gettempdir(), f"janus_report_{report_id}.{format}")
+        result = manager.export_report(report_id, format, output_path)
+        
+        if result:
+            media_types = {
+                "json": "application/json",
+                "html": "text/html",
+                "pdf": "application/pdf",
+                "sarif": "application/json"
+            }
+            return FileResponse(
+                result, 
+                filename=f"janus_report_{report_id}.{format}",
+                media_type=media_types.get(format, "application/octet-stream")
+            )
+        else:
+            return {"error": "Failed to export report"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.delete("/api/reports/{report_id}")
+async def delete_report(report_id: str):
+    """Delete a report."""
+    try:
+        from janus.reporting.report_manager import get_report_manager
+        manager = get_report_manager()
+        
+        if manager.delete_report(report_id):
+            return {"success": True, "message": f"Report {report_id} deleted"}
+        else:
+            return {"error": f"Report {report_id} not found"}
     except Exception as e:
         return {"error": str(e)}
 

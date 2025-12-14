@@ -1721,6 +1721,138 @@ def schedule_cmd(
         console.print("[dim]Available actions: list, add, remove, run, start, stop[/dim]")
 
 
+@app.command("reports")
+def reports_cmd(
+    action: str = typer.Argument("list", help="Action: list, view, export, delete, stats"),
+    report_id: str = typer.Option("", "--id", "-i", help="Report ID"),
+    format: str = typer.Option("json", "--format", "-f", help="Export format: json, html, pdf, sarif"),
+    output: str = typer.Option("", "--output", "-o", help="Output file path"),
+    limit: int = typer.Option(20, "--limit", "-l", help="Number of reports to list"),
+    target: str = typer.Option("", "--target", "-t", help="Filter by target URL"),
+):
+    """
+    📊 Manage scan reports.
+    
+    Actions:
+    - list: Show all stored reports
+    - view: View a specific report
+    - export: Export report to file (json, html, pdf, sarif)
+    - delete: Delete a report
+    - stats: Show report statistics
+    """
+    print_banner()
+    
+    from janus.reporting.report_manager import get_report_manager
+    
+    manager = get_report_manager()
+    
+    if action == "list":
+        reports = manager.list_reports(limit=limit, target_url=target if target else None)
+        
+        if not reports:
+            console.print("[yellow]No reports found.[/yellow]")
+            console.print("[dim]Run a scan to generate reports.[/dim]")
+            return
+        
+        table = Table(title=f"Stored Reports ({len(reports)})")
+        table.add_column("ID", style="cyan")
+        table.add_column("Target")
+        table.add_column("Type")
+        table.add_column("Findings")
+        table.add_column("Date")
+        table.add_column("Tags")
+        
+        for r in reports:
+            findings_str = f"[red]{r.critical_count}C[/red] [yellow]{r.high_count}H[/yellow] [blue]{r.medium_count}M[/blue] [dim]{r.low_count}L[/dim]"
+            tags = ", ".join(r.tags) if r.tags else "-"
+            table.add_row(
+                r.id,
+                r.target_url[:35] + "..." if len(r.target_url) > 35 else r.target_url,
+                r.scan_type,
+                findings_str,
+                r.created_at[:16],
+                tags
+            )
+        
+        console.print(table)
+        console.print(f"\n[dim]Use 'janus reports view --id <ID>' to view details[/dim]")
+        console.print(f"[dim]Use 'janus reports export --id <ID> --format pdf' to export[/dim]")
+    
+    elif action == "view":
+        if not report_id:
+            console.print("[red]Error: --id is required for view action[/red]")
+            raise typer.Exit(1)
+        
+        report = manager.get_report(report_id)
+        if not report:
+            console.print(f"[red]Report {report_id} not found[/red]")
+            raise typer.Exit(1)
+        
+        metadata = manager.get_metadata(report_id)
+        
+        console.print(f"\n[bold cyan]Report: {report_id}[/bold cyan]")
+        console.print(f"Target: {report.get('target_url', 'Unknown')}")
+        console.print(f"Date: {metadata.created_at if metadata else 'Unknown'}")
+        console.print(f"Duration: {report.get('duration_seconds', 0):.1f}s")
+        
+        console.print(f"\n[bold]Findings Summary:[/bold]")
+        console.print(f"  [red]Critical:[/red] {report.get('critical_count', 0)}")
+        console.print(f"  [yellow]High:[/yellow] {report.get('high_count', 0)}")
+        console.print(f"  [blue]Medium:[/blue] {report.get('medium_count', 0)}")
+        console.print(f"  [dim]Low:[/dim] {report.get('low_count', 0)}")
+        console.print(f"  Total: {report.get('total_findings', 0)}")
+        
+        # Show results
+        results = report.get('results', [])
+        if results:
+            console.print(f"\n[bold]Module Results:[/bold]")
+            for r in results:
+                if r.get('findings_count', 0) > 0:
+                    sev = r.get('severity', 'INFO')
+                    sev_color = {"CRITICAL": "red", "HIGH": "yellow", "MEDIUM": "blue"}.get(sev, "dim")
+                    console.print(f"  [{sev_color}]▸ {r.get('module')}: {r.get('findings_count')} findings ({sev})[/{sev_color}]")
+    
+    elif action == "export":
+        if not report_id:
+            console.print("[red]Error: --id is required for export action[/red]")
+            raise typer.Exit(1)
+        
+        output_path = output if output else None
+        result = manager.export_report(report_id, format, output_path)
+        
+        if result:
+            console.print(f"[green]✓ Report exported to: {result}[/green]")
+        else:
+            console.print(f"[red]Failed to export report. Check if reportlab is installed for PDF.[/red]")
+    
+    elif action == "delete":
+        if not report_id:
+            console.print("[red]Error: --id is required for delete action[/red]")
+            raise typer.Exit(1)
+        
+        if manager.delete_report(report_id):
+            console.print(f"[green]✓ Report {report_id} deleted[/green]")
+        else:
+            console.print(f"[red]Report {report_id} not found[/red]")
+    
+    elif action == "stats":
+        stats = manager.get_stats()
+        
+        console.print("[bold]Report Statistics[/bold]\n")
+        console.print(f"  Total Reports: {stats.get('total_reports', 0)}")
+        console.print(f"  Total Findings: {stats.get('total_findings', 0)}")
+        console.print(f"    [red]Critical:[/red] {stats.get('critical_total', 0)}")
+        console.print(f"    [yellow]High:[/yellow] {stats.get('high_total', 0)}")
+        console.print(f"  Unique Targets: {stats.get('targets_scanned', 0)}")
+        console.print(f"  Scan Types: {', '.join(stats.get('scan_types', []))}")
+        if stats.get('latest_scan'):
+            console.print(f"  Latest Scan: {stats['latest_scan'][:16]}")
+    
+    else:
+        console.print(f"[red]Unknown action: {action}[/red]")
+        console.print("[dim]Available actions: list, view, export, delete, stats[/dim]")
+
+
 def main():
     app()
 
