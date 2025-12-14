@@ -8,7 +8,8 @@
 
 **Janus** is an enterprise-grade API security scanner designed for Red Teams and advanced security testing. Features 15+ security testing modules for comprehensive vulnerability assessment.
 
-![Janus Dashboard](docs/dashboard-preview.png)
+![Janus Dashboard Demo](docs/dashboard-demo.webp)
+
 
 ## Features 🚀
 
