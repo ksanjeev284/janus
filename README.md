@@ -16,10 +16,14 @@
 -   **Broken Function Level Authorization (BFLA)**: Vertical privilege escalation testing.
 -   **PII & Secrets Scanning**: Detect sensitive data leaks in API responses.
 -   **Race Condition Testing**: Multi-threaded exploitation of concurrency bugs.
+-   **SSRF Testing**: Server-Side Request Forgery with 25+ payloads (internal networks, cloud metadata, file protocols).
 -   **Stealth Mode**: WAF evasion with header rotation, jitter, and proxies.
+-   **Proxy Support**: HTTP, HTTPS, and SOCKS5 proxies (including Tor).
+-   **Custom Headers**: Add custom headers to all requests.
 -   **Team Collaboration**: Real-time finding synchronization via Redis/Hive-Mind.
 -   **CI/CD Integration**: Export findings to SARIF for GitHub Security tab.
 -   **Web Dashboard**: Modern UI for managing scans and viewing reports.
+-   **Webhook Notifications**: Send alerts to Discord, Slack, or custom endpoints.
 
 ## Installation 📦
 
@@ -60,6 +64,11 @@ Janus provides a powerful CLI for automation testing.
 janus scan --victim <token> --attacker <token> --host <url>
 ```
 
+**SSRF Testing:**
+```bash
+janus ssrf --endpoint https://api.example.com/fetch --param url --quick
+```
+
 **Stealth Test:**
 ```bash
 janus stealth-test
@@ -68,6 +77,21 @@ janus stealth-test
 **Vertical Escalation (BFLA):**
 ```bash
 janus bfla --host https://api.example.com --low <user_token>
+```
+
+### 3. Proxy & Custom Headers
+
+Using the HTTP client programmatically:
+```python
+from janus.core.http_client import JanusHTTPClient
+
+client = JanusHTTPClient()
+client.set_proxy("http://proxy.example.com:8080")  # HTTP proxy
+client.set_proxy("socks5://127.0.0.1:9050", "socks5")  # Tor
+client.add_global_header("X-API-Key", "your-key")
+client.set_ssl_verify(False)  # For testing
+
+status, body, raw = client.get("https://api.example.com", token="Bearer xyz")
 ```
 
 ## Architecture 🏗️
@@ -81,3 +105,4 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for deta
 ## License 📄
 
 MIT License - see [LICENSE](LICENSE) for details.
+

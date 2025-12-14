@@ -144,6 +144,12 @@ def get_dashboard_html(tokens: list) -> str:
                 <button onclick="showTab('team')" id="tab-team" class="px-6 py-3 text-sm font-medium text-gray-400 hover:text-gray-200">
                     🐝 Hive-Mind
                 </button>
+                <button onclick="showTab('ssrf')" id="tab-ssrf" class="px-6 py-3 text-sm font-medium text-gray-400 hover:text-gray-200">
+                    🌐 SSRF
+                </button>
+                <button onclick="showTab('settings')" id="tab-settings" class="px-6 py-3 text-sm font-medium text-gray-400 hover:text-gray-200">
+                    ⚙️ Settings
+                </button>
             </div>
 
             <!-- Tab Content Container -->
@@ -391,6 +397,98 @@ def get_dashboard_html(tokens: list) -> str:
                                 🔄 Check Team Status
                             </button>
                         </div>
+                    </div>
+
+                    <!-- SSRF Tab (New) -->
+                    <div id="panel-ssrf" class="bg-janus-card rounded-xl p-6 border border-gray-800 glow-green hidden">
+                        <h2 class="text-lg font-semibold mb-4">🌐 SSRF Testing</h2>
+                        <form id="ssrfForm" class="space-y-4">
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-1">Target Endpoint</label>
+                                <input type="text" name="endpoint" placeholder="https://api.example.com/fetch"
+                                       class="w-full px-3 py-2 bg-janus-bg border border-gray-700 rounded-lg mono text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-1">URL Parameter Name</label>
+                                <input type="text" name="param" value="url" 
+                                       class="w-full px-3 py-2 bg-janus-bg border border-gray-700 rounded-lg mono text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-1">Auth Token (optional)</label>
+                                <input type="text" name="token" placeholder="Bearer xyz..."
+                                       class="w-full px-3 py-2 bg-janus-bg border border-gray-700 rounded-lg mono text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-1">Category Filter</label>
+                                <select name="category" class="w-full px-3 py-2 bg-janus-bg border border-gray-700 rounded-lg mono text-sm">
+                                    <option value="">All Categories</option>
+                                    <option value="internal">Internal Network</option>
+                                    <option value="cloud_metadata">Cloud Metadata</option>
+                                    <option value="file">File Protocol</option>
+                                    <option value="bypass">Bypass Techniques</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="w-full py-3 bg-janus-green hover:bg-green-600 rounded-lg font-semibold transition-all">
+                                🌐 Test SSRF
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Settings Tab (New) -->
+                    <div id="panel-settings" class="bg-janus-card rounded-xl p-6 border border-gray-800 hidden">
+                        <h2 class="text-lg font-semibold mb-4">⚙️ Network Settings</h2>
+                        <form id="settingsForm" class="space-y-4">
+                            <div class="bg-janus-bg p-4 rounded-lg border border-gray-700">
+                                <h3 class="font-semibold text-sm mb-3 text-janus-accent">🔌 Proxy Configuration</h3>
+                                <div class="space-y-3">
+                                    <div>
+                                        <label class="block text-sm text-gray-400 mb-1">Proxy URL</label>
+                                        <input type="text" name="proxy" id="proxyInput" placeholder="http://proxy:8080 or socks5://127.0.0.1:9050"
+                                               class="w-full px-3 py-2 bg-janus-card border border-gray-700 rounded-lg mono text-sm">
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <input type="checkbox" id="useTor" name="use_tor" class="rounded">
+                                        <label class="text-sm text-gray-300">Use Tor (socks5://127.0.0.1:9050)</label>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-janus-bg p-4 rounded-lg border border-gray-700">
+                                <h3 class="font-semibold text-sm mb-3 text-janus-blue">📋 Custom Headers</h3>
+                                <div class="space-y-3">
+                                    <div>
+                                        <label class="block text-sm text-gray-400 mb-1">Headers (one per line, "Name: Value")</label>
+                                        <textarea name="headers" id="headersInput" rows="4" placeholder="X-Custom-Header: value&#10;X-API-Key: your-key"
+                                                  class="w-full px-3 py-2 bg-janus-card border border-gray-700 rounded-lg mono text-sm"></textarea>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-janus-bg p-4 rounded-lg border border-gray-700">
+                                <h3 class="font-semibold text-sm mb-3 text-janus-purple">🔒 SSL & Timeout</h3>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div class="flex items-center gap-2">
+                                        <input type="checkbox" id="noVerify" name="no_verify" class="rounded">
+                                        <label class="text-sm text-gray-300">Skip SSL Verification</label>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm text-gray-400 mb-1">Timeout (sec)</label>
+                                        <input type="number" name="timeout" value="30" 
+                                               class="w-full px-3 py-2 bg-janus-card border border-gray-700 rounded-lg mono text-sm">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="flex gap-3">
+                                <button type="submit" class="flex-1 py-3 bg-janus-accent hover:bg-red-600 rounded-lg font-semibold transition-all">
+                                    💾 Save Settings
+                                </button>
+                                <button type="button" onclick="testProxy()" class="flex-1 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg font-semibold transition-all">
+                                    🧪 Test Connection
+                                </button>
+                            </div>
+                        </form>
+                        <div id="settingsStatus" class="hidden mt-4 p-4 rounded-lg border"></div>
                     </div>
                 </div>
 
@@ -1159,6 +1257,119 @@ async def test_stealth():
         "status": "ready"
     }
 
+
+# Global settings for HTTP client
+network_settings = {
+    "proxy": None,
+    "headers": {},
+    "no_verify": False,
+    "timeout": 30
+}
+
+
+@app.post("/api/ssrf")
+async def test_ssrf(
+    endpoint: str = Form(...),
+    param: str = Form(...),
+    token: str = Form(None),
+    category: str = Form(None)
+):
+    """Test for SSRF vulnerabilities."""
+    from janus.attack.ssrf import SSRFTester
+    
+    tester = SSRFTester(timeout=10)
+    
+    categories = [category] if category else None
+    results = tester.test_endpoint(
+        endpoint=endpoint,
+        param_name=param,
+        token=token,
+        categories=categories
+    )
+    
+    report = tester.generate_report(results)
+    
+    return {
+        "total_tests": report["total_tests"],
+        "vulnerable_count": report["vulnerable_count"],
+        "critical_count": report["critical_count"],
+        "high_count": report["high_count"],
+        "findings": report["findings"]
+    }
+
+
+@app.post("/api/settings")
+async def save_settings(
+    proxy: str = Form(None),
+    headers: str = Form(None),
+    no_verify: bool = Form(False),
+    timeout: int = Form(30)
+):
+    """Save network settings (proxy, headers, SSL, timeout)."""
+    global network_settings
+    
+    network_settings["proxy"] = proxy if proxy else None
+    network_settings["no_verify"] = no_verify
+    network_settings["timeout"] = timeout
+    
+    # Parse headers from text (one per line, "Name: Value")
+    if headers:
+        parsed_headers = {}
+        for line in headers.strip().split("\n"):
+            if ":" in line:
+                name, value = line.split(":", 1)
+                parsed_headers[name.strip()] = value.strip()
+        network_settings["headers"] = parsed_headers
+    else:
+        network_settings["headers"] = {}
+    
+    return {
+        "success": True,
+        "settings": network_settings
+    }
+
+
+@app.get("/api/settings")
+async def get_settings():
+    """Get current network settings."""
+    return network_settings
+
+
+@app.post("/api/test-proxy")
+async def test_proxy_connection():
+    """Test proxy connection."""
+    from janus.core.http_client import JanusHTTPClient, ProxyConfig, RequestConfig
+    
+    proxy_config = ProxyConfig(enabled=False)
+    if network_settings.get("proxy"):
+        proxy_config.enabled = True
+        proxy = network_settings["proxy"].lower()
+        if proxy.startswith("socks"):
+            proxy_config.socks_proxy = network_settings["proxy"]
+        else:
+            proxy_config.http_proxy = network_settings["proxy"]
+            proxy_config.https_proxy = network_settings["proxy"]
+    
+    request_config = RequestConfig(
+        timeout=network_settings.get("timeout", 30),
+        verify_ssl=not network_settings.get("no_verify", False)
+    )
+    
+    client = JanusHTTPClient(proxy_config, request_config)
+    
+    # Add custom headers
+    for name, value in network_settings.get("headers", {}).items():
+        client.add_global_header(name, value)
+    
+    # Test connection
+    success = client.test_connection()
+    
+    return {
+        "success": success,
+        "proxy_enabled": proxy_config.enabled,
+        "proxy": network_settings.get("proxy"),
+        "headers_count": len(network_settings.get("headers", {}))
+    }
 
 @app.get("/api/team")
 async def team_status(team_id: str = "default"):
