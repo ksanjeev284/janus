@@ -42,6 +42,24 @@ app = FastAPI(
 scan_results = {}
 
 
+# Favicon - SVG trident icon
+FAVICON_SVG = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+<defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+<stop offset="0%" style="stop-color:#f43f5e"/><stop offset="100%" style="stop-color:#ec4899"/>
+</linearGradient></defs>
+<circle cx="50" cy="50" r="48" fill="#0d1117"/>
+<text x="50" y="68" font-size="55" text-anchor="middle" fill="url(#g)">🔱</text>
+</svg>'''
+
+
+@app.get("/favicon.ico")
+async def favicon():
+    """Serve favicon."""
+    from fastapi.responses import Response
+    return Response(content=FAVICON_SVG, media_type="image/svg+xml")
+
+
+
 def get_dashboard_html(tokens: list) -> str:
     """Generate the full-featured dashboard HTML."""
     
