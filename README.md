@@ -24,6 +24,7 @@
 - **XSS Scanner** - Context-aware cross-site scripting detection with 30+ payloads
 - **SSRF Testing** - Server-side request forgery with 25+ payloads (internal networks, cloud metadata)
 - **Path Traversal/LFI** - Directory traversal with encoding bypasses
+- **SSTI Scanner** - Server-Side Template Injection (Jinja2, Twig, Smarty, FreeMarker, Velocity, Mako, ERB, Pebble, Thymeleaf)
 
 ### Configuration Analysis
 - **Security Headers** - HSTS, CSP, X-Frame-Options analysis with A-F grading
@@ -38,6 +39,8 @@
 - **CVE Lookup** - Check for known vulnerabilities
 
 ### Advanced Features
+- **GraphQL Introspection** - Schema analysis, sensitive fields, dangerous mutations, depth limit testing
+- **WebSocket Testing** - Auth bypass, CSWSH, message injection, sensitive data exposure
 - **Proxy Support** - HTTP, HTTPS, SOCKS5 (including Tor)
 - **Custom Headers** - Add custom headers to all requests
 - **Stealth Mode** - WAF evasion with header rotation and jitter
@@ -94,6 +97,9 @@ janus ssrf --endpoint https://api.example.com/fetch --param url
 
 # Path Traversal / LFI
 janus lfi --url "https://example.com/view?file=test" --param file
+
+# SSTI (Template Injection)
+janus ssti --url "https://example.com/page?name=test" --param name
 ```
 
 #### Configuration Analysis
@@ -124,6 +130,12 @@ janus pii --url https://api.example.com/user/1 --token <token>
 
 # Race Condition
 janus race --url https://api.example.com/withdraw --token <token>
+
+# GraphQL Security Analysis
+janus graphql-analyze --url https://api.example.com/graphql
+
+# WebSocket Testing
+janus websocket --url wss://example.com/ws --token <token>
 ```
 
 ## Proxy & Custom Headers

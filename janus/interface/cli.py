@@ -1380,6 +1380,154 @@ def auto_scan(
         console.print(f"\n[cyan]📄 Report exported to {output}[/cyan]")
 
 
+@app.command()
+def ssti(
+    url: str = typer.Option(..., "--url", "-u", help="Target URL with parameters"),
+    param: str = typer.Option(None, "--param", "-p", help="Specific parameter to test"),
+    token: str = typer.Option(None, "--token", "-t", help="Authorization token"),
+    engine: str = typer.Option(None, "--engine", "-e", help="Specific engine to test (jinja2, twig, smarty, etc.)"),
+):
+    """
+    🧪 Test for Server-Side Template Injection (SSTI).
+    
+    Supports: Jinja2, Twig, Smarty, FreeMarker, Velocity, Mako, ERB, Pebble, Thymeleaf.
+    """
+    print_banner()
+    
+    from janus.attack.ssti_scanner import SSTIScanner
+    
+    console.print(f"[cyan]Testing for SSTI on {url}[/cyan]\n")
+    
+    scanner = SSTIScanner(timeout=10)
+    params = [param] if param else None
+    engines = [engine] if engine else None
+    
+    report = scanner.scan(url, params=params, token=token, engines=engines)
+    
+    if report.vulnerable_params > 0:
+        console.print(f"[bold red]🚨 SSTI VULNERABILITY DETECTED![/bold red]\n")
+        
+        table = Table(title="SSTI Findings")
+        table.add_column("Parameter", style="cyan")
+        table.add_column("Engine", style="yellow")
+        table.add_column("Payload")
+        table.add_column("Evidence")
+        
+        for f in report.findings:
+            table.add_row(
+                f.parameter,
+                f.template_engine,
+                f.payload[:30],
+                f.evidence[:40]
+            )
+        
+        console.print(table)
+        console.print(f"\n[yellow]Recommendation: Never pass user input directly to template engines[/yellow]")
+    else:
+        console.print("[green]✓ No SSTI vulnerabilities detected[/green]")
+
+
+@app.command("graphql-analyze")
+def graphql_analyze(
+    url: str = typer.Option(..., "--url", "-u", help="GraphQL endpoint URL"),
+    token: str = typer.Option(None, "--token", "-t", help="Authorization token"),
+    deep: bool = typer.Option(True, "--deep/--quick", help="Deep scan vs quick introspection"),
+):
+    """
+    🔍 Analyze GraphQL endpoint for security issues.
+    
+    Tests: Introspection, depth limits, batch queries, sensitive fields.
+    """
+    print_banner()
+    
+    from janus.attack.graphql_introspection import GraphQLIntrospector
+    
+    console.print(f"[cyan]Analyzing GraphQL endpoint: {url}[/cyan]\n")
+    
+    analyzer = GraphQLIntrospector(timeout=30)
+    report = analyzer.analyze(url, token, deep_scan=deep)
+    
+    # Schema info
+    if report.introspection_enabled:
+        console.print(f"[yellow]⚠ Introspection ENABLED[/yellow]")
+        console.print(f"  Types: {report.types_discovered}")
+        console.print(f"  Queries: {report.queries_found}")
+        console.print(f"  Mutations: {report.mutations_found}")
+        console.print(f"  Subscriptions: {report.subscriptions_found}\n")
+        
+        if report.queries[:5]:
+            console.print("[bold]Sample Queries:[/bold]")
+            for q in report.queries[:5]:
+                console.print(f"  • {q.name}({', '.join(q.arguments[:3])})")
+        
+        if report.mutations[:5]:
+            console.print("\n[bold]Sample Mutations:[/bold]")
+            for m in report.mutations[:5]:
+                console.print(f"  • {m.name}({', '.join(m.arguments[:3])})")
+    else:
+        console.print("[green]✓ Introspection disabled[/green]")
+    
+    # Security findings
+    if report.security_findings:
+        console.print(f"\n[bold red]🚨 {len(report.security_findings)} Security Issues Found:[/bold red]\n")
+        
+        for f in report.security_findings:
+            sev_color = {"CRITICAL": "red", "HIGH": "yellow", "MEDIUM": "blue", "LOW": "dim"}.get(f.severity, "white")
+            console.print(f"[{sev_color}]▸ {f.issue}[/{sev_color}] ({f.severity})")
+            console.print(f"  [dim]{f.evidence}[/dim]")
+            console.print(f"  [cyan]→ {f.recommendation}[/cyan]\n")
+    
+    # Sensitive fields
+    if report.sensitive_fields:
+        console.print(f"\n[yellow]⚠ Potentially Sensitive Fields:[/yellow]")
+        for field in report.sensitive_fields[:10]:
+            console.print(f"  • {field}")
+
+
+@app.command()
+def websocket(
+    url: str = typer.Option(..., "--url", "-u", help="WebSocket URL (ws:// or wss://)"),
+    token: str = typer.Option(None, "--token", "-t", help="Authorization token"),
+    origin: str = typer.Option(None, "--origin", "-o", help="Custom origin header for CSWSH testing"),
+    message: str = typer.Option(None, "--message", "-m", help="Custom message to send"),
+):
+    """
+    🔌 Test WebSocket endpoint for security issues.
+    
+    Tests: Auth bypass, CSWSH, message injection, sensitive data exposure.
+    """
+    print_banner()
+    
+    from janus.attack.websocket_tester import WebSocketTester
+    
+    console.print(f"[cyan]Testing WebSocket: {url}[/cyan]\n")
+    
+    tester = WebSocketTester(timeout=10)
+    messages = [message] if message else None
+    
+    report = tester.test(url, token, origin, messages)
+    
+    if report.connected:
+        console.print("[green]✓ Connection established[/green]")
+        console.print(f"  Messages exchanged: {report.messages_exchanged}")
+        
+        if report.security_findings:
+            console.print(f"\n[bold red]🚨 {len(report.security_findings)} Security Issues Found:[/bold red]\n")
+            
+            for f in report.security_findings:
+                sev_color = {"CRITICAL": "red", "HIGH": "yellow", "MEDIUM": "blue"}.get(f.severity, "dim")
+                console.print(f"[{sev_color}]▸ {f.issue}[/{sev_color}]")
+                console.print(f"  [dim]{f.evidence}[/dim]")
+                console.print(f"  [cyan]→ {f.recommendation}[/cyan]\n")
+        else:
+            console.print("\n[green]✓ No security issues detected[/green]")
+    else:
+        console.print(f"[red]✗ Connection failed: {report.connection_error}[/red]")
+        
+        if "websockets" in str(report.connection_error):
+            console.print("[yellow]Install websockets: pip install websockets[/yellow]")
+
+
 def main():
     app()
 
