@@ -990,7 +990,127 @@ def get_modern_dashboard_html(tokens: list) -> str:
         showPanel = function(panelId) {{
             origShowPanel(panelId);
             if (panelId === 'reports') loadReports();
+            if (panelId === 'scheduler') loadSchedules();
         }};
+        
+        // ================== SCHEDULER FUNCTIONS ==================
+        
+        // Handle scheduler form submission
+        document.getElementById('schedulerForm').addEventListener('submit', async (e) => {{
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            
+            try {{
+                const response = await fetch('/api/schedules', {{
+                    method: 'POST',
+                    body: formData
+                }});
+                const data = await response.json();
+                
+                if (data.error) {{
+                    alert('Error: ' + data.error);
+                }} else {{
+                    alert('Schedule created successfully! ID: ' + (data.schedule?.id || 'unknown'));
+                    e.target.reset();
+                    loadSchedules();
+                }}
+            }} catch (err) {{
+                alert('Failed to create schedule: ' + err.message);
+            }}
+        }});
+        
+        async function loadSchedules() {{
+            const container = document.getElementById('schedulesLista');
+            container.innerHTML = '<div class="text-gray-500">Loading...</div>';
+            
+            try {{
+                const response = await fetch('/api/schedules');
+                const data = await response.json();
+                
+                if (data.error) {{
+                    container.innerHTML = `<div class="text-red-400">${{data.error}}</div>`;
+                    return;
+                }}
+                
+                const schedules = data.schedules || [];
+                if (schedules.length === 0) {{
+                    container.innerHTML = '<div class="text-gray-500 text-center py-4">No schedules configured.</div>';
+                    return;
+                }}
+                
+                let html = '<div class="space-y-2 mt-4"><h4 class="font-semibold text-green-400 mb-2">📅 Active Schedules</h4>';
+                schedules.forEach(s => {{
+                    const statusBadge = s.enabled ? 
+                        '<span class="text-[10px] bg-green-500/20 text-green-400 px-2 py-0.5 rounded">Active</span>' :
+                        '<span class="text-[10px] bg-gray-500/20 text-gray-400 px-2 py-0.5 rounded">Disabled</span>';
+                    const lastRun = s.last_run ? s.last_run.substring(0, 16).replace('T', ' ') : 'Never';
+                    
+                    html += `
+                    <div class="bg-dark-900 rounded-xl p-3 border border-dark-600 group">
+                        <div class="flex items-center justify-between">
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-medium text-sm">${{s.name || 'Unnamed'}}</span>
+                                    ${{statusBadge}}
+                                </div>
+                                <div class="text-xs text-gray-500 truncate mt-1">${{s.target_url || 'No URL'}}</div>
+                                <div class="text-xs text-gray-600">Last: ${{lastRun}} • ${{s.schedule_type || 'daily'}}</div>
+                            </div>
+                            <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onclick="runSchedule('${{s.id}}')" class="p-1.5 hover:bg-green-900/50 rounded-lg text-xs text-green-400" title="Run Now">▶️</button>
+                                <button onclick="deleteSchedule('${{s.id}}')" class="p-1.5 hover:bg-red-900/50 rounded-lg text-xs text-red-400" title="Delete">🗑️</button>
+                            </div>
+                        </div>
+                    </div>`;
+                }});
+                
+                // Show history
+                const history = data.history || [];
+                if (history.length > 0) {{
+                    html += '<h4 class="font-semibold text-blue-400 mt-4 mb-2">📜 Recent History</h4>';
+                    history.slice(0, 5).forEach(h => {{
+                        const status = h.success ? '✅' : '❌';
+                        const time = h.start_time ? h.start_time.substring(0, 16).replace('T', ' ') : 'Unknown';
+                        html += `<div class="text-xs text-gray-500">${{status}} ${{h.schedule_name || 'Scan'}} - ${{h.findings_count || 0}} findings (${{time}})</div>`;
+                    }});
+                }}
+                
+                html += '</div>';
+                container.innerHTML = html;
+            }} catch (err) {{
+                container.innerHTML = `<div class="text-red-400">Failed to load: ${{err.message}}</div>`;
+            }}
+        }}
+        
+        async function runSchedule(scheduleId) {{
+            if (!confirm('Run this scheduled scan now?')) return;
+            
+            try {{
+                const response = await fetch(`/api/schedules/${{scheduleId}}/run`, {{ method: 'POST' }});
+                const data = await response.json();
+                
+                if (data.error) {{
+                    alert('Error: ' + data.error);
+                }} else {{
+                    alert(`Scan complete! Found ${{data.findings_count || 0}} findings.`);
+                    loadSchedules();
+                    loadReports();
+                }}
+            }} catch (err) {{
+                alert('Failed to run: ' + err.message);
+            }}
+        }}
+        
+        async function deleteSchedule(scheduleId) {{
+            if (!confirm('Delete this schedule?')) return;
+            
+            try {{
+                await fetch(`/api/schedules/${{scheduleId}}`, {{ method: 'DELETE' }});
+                loadSchedules();
+            }} catch (err) {{
+                alert('Failed to delete: ' + err.message);
+            }}
+        }}
     </script>
 </body>
 </html>
