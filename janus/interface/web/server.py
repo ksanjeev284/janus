@@ -1689,23 +1689,76 @@ async def get_report_html():
     
     # Add auto-scan results if available
     if autoscan_reports:
-        html += '<div class="card"><h2>Auto Scan Results</h2>'
         for scan_id, report in autoscan_reports.items():
             html += f'''
-            <div style="margin:10px 0;padding:15px;background:#0d1117;border-radius:8px;">
-                <strong>{report.target_url}</strong><br>
-                <span class="stat"><span class="stat-value">{report.total_findings}</span><br>Findings</span>
-                <span class="stat"><span class="stat-value critical">{report.critical_count}</span><br>Critical</span>
-                <span class="stat"><span class="stat-value high">{report.high_count}</span><br>High</span>
-                <span class="stat"><span class="stat-value medium">{report.medium_count}</span><br>Medium</span>
+            <div class="card">
+                <h2>🎯 Auto Scan: {report.target_url}</h2>
+                <p style="color:#8b949e;">Scan ID: {scan_id} | Duration: {report.duration_seconds:.1f}s</p>
+                <div style="margin:20px 0;">
+                    <span class="stat"><span class="stat-value">{report.total_findings}</span><br>Total Findings</span>
+                    <span class="stat"><span class="stat-value critical">{report.critical_count}</span><br>Critical</span>
+                    <span class="stat"><span class="stat-value high">{report.high_count}</span><br>High</span>
+                    <span class="stat"><span class="stat-value medium">{report.medium_count}</span><br>Medium</span>
+                    <span class="stat"><span class="stat-value low">{report.low_count}</span><br>Low</span>
+                </div>
             </div>
             '''
+            
+            # Detailed findings for each module
             for r in report.results:
-                if r.vulnerable and r.findings_count > 0:
-                    severity_colors = {"CRITICAL": "#f43f5e", "HIGH": "#fb923c", "MEDIUM": "#fbbf24", "LOW": "#38bdf8"}
+                if r.findings_count > 0:
+                    severity_colors = {"CRITICAL": "#f43f5e", "HIGH": "#fb923c", "MEDIUM": "#fbbf24", "LOW": "#38bdf8", "INFO": "#8b949e"}
                     color = severity_colors.get(r.severity, "#8b949e")
-                    html += f'<div style="margin:5px 0;color:{color};">▸ {r.module}: {r.findings_count} findings</div>'
-        html += '</div>'
+                    border_color = color
+                    
+                    html += f'''
+                    <div class="card" style="border-left: 4px solid {border_color};">
+                        <h3 style="color:{color};margin:0 0 10px 0;">{r.module} <span style="font-size:14px;color:#8b949e;">({r.category})</span></h3>
+                        <p style="margin:5px 0;"><strong>Status:</strong> {'🚨 VULNERABLE' if r.vulnerable else '✓ OK'} | <strong>Severity:</strong> <span style="color:{color};">{r.severity}</span> | <strong>Findings:</strong> {r.findings_count}</p>
+                    '''
+                    
+                    if r.findings:
+                        html += '<div style="margin-top:15px;">'
+                        html += '<table style="width:100%;border-collapse:collapse;font-size:13px;">'
+                        html += '<thead><tr style="background:#21262d;"><th style="padding:10px;text-align:left;border-bottom:1px solid #30363d;">Finding</th><th style="padding:10px;text-align:left;border-bottom:1px solid #30363d;">Details</th></tr></thead>'
+                        html += '<tbody>'
+                        
+                        for i, finding in enumerate(r.findings[:50]):  # Limit to 50 findings
+                            # Extract relevant info from finding dict
+                            if isinstance(finding, dict):
+                                # Try different common keys
+                                name = finding.get('header', finding.get('file_type', finding.get('path', finding.get('name', f'Finding {i+1}'))))
+                                details_parts = []
+                                
+                                if 'status' in finding:
+                                    details_parts.append(f"Status: {finding['status']}")
+                                if 'description' in finding:
+                                    details_parts.append(finding['description'])
+                                if 'recommendation' in finding:
+                                    details_parts.append(f"Fix: {finding['recommendation']}")
+                                if 'evidence' in finding:
+                                    details_parts.append(f"Evidence: {finding['evidence'][:100]}")
+                                if 'url' in finding:
+                                    details_parts.append(f"URL: {finding['url']}")
+                                if 'category' in finding:
+                                    details_parts.append(f"Category: {finding['category']}")
+                                if 'severity' in finding:
+                                    details_parts.append(f"Severity: {finding['severity']}")
+                                    
+                                details = ' | '.join(details_parts) if details_parts else str(finding)[:200]
+                            else:
+                                name = f'Finding {i+1}'
+                                details = str(finding)[:200]
+                            
+                            row_bg = '#161b22' if i % 2 == 0 else '#1c2128'
+                            html += f'<tr style="background:{row_bg};"><td style="padding:8px;border-bottom:1px solid #21262d;color:#e6edf3;">{name}</td><td style="padding:8px;border-bottom:1px solid #21262d;color:#8b949e;font-size:12px;">{details}</td></tr>'
+                        
+                        if len(r.findings) > 50:
+                            html += f'<tr><td colspan="2" style="padding:10px;text-align:center;color:#8b949e;">... and {len(r.findings) - 50} more findings</td></tr>'
+                        
+                        html += '</tbody></table></div>'
+                    
+                    html += '</div>'
     
     html += '''
     <footer style="text-align:center;margin-top:40px;color:#8b949e;">
