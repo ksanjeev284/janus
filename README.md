@@ -138,6 +138,50 @@ client.set_ssl_verify(False)  # For testing
 status, body, raw = client.get("https://api.example.com", token="Bearer xyz")
 ```
 
+## Tor Support 🧅
+
+Route all scan traffic through Tor for anonymity:
+
+### Requirements
+1. **Install Tor** on your system
+2. **Start Tor service** (listens on port 9050)
+
+### Installation
+
+**Windows (Chocolatey):**
+```bash
+choco install tor
+tor  # Start the service
+```
+
+**Linux (Ubuntu/Debian):**
+```bash
+sudo apt install tor
+sudo systemctl start tor
+```
+
+**macOS:**
+```bash
+brew install tor
+tor  # Start the service
+```
+
+### Usage
+
+**Dashboard:** Settings tab → Check "Use Tor" → Click Test
+
+**CLI:**
+```bash
+janus stealth-test --tor
+```
+
+**Programmatic:**
+```python
+client.set_proxy("socks5://127.0.0.1:9050", "socks5")
+```
+
+> **Note:** Tor Browser uses port **9150**, while Tor service uses **9050**.
+
 ## CI/CD Integration
 
 ```bash
